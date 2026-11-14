@@ -69,7 +69,7 @@ export const SUSANOO_BREAK_PHRASE =
   'Eu aceito quebrar meu Susanoo e perder Chakra';
 
 export const TIMER_PRESETS_MINUTES = {
-  focus: [25, 50, 90] as const,
+  focus: [25, 35, 50, 75, 90] as const,
   shortBreak: [5, 10] as const,
   longBreak: [15] as const,
 };

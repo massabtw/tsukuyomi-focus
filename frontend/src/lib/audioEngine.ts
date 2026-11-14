@@ -1,4 +1,4 @@
-import type { AudioSettings } from '@/types/tsukuyomi';
+import type { AudioSettings, EyeStage } from '@/types/tsukuyomi';
 
 export type StudioSoundId =
   | 'rain-amegakure'
@@ -6,6 +6,7 @@ export type StudioSoundId =
   | 'binaural-genjutsu'
   | 'sharingan-activate'
   | 'mangekyou-awaken'
+  | 'rinnegan-awaken'
   | 'tsukuyomi-cast'
   | 'susanoo-summon'
   | 'amaterasu-ignite'
@@ -22,6 +23,7 @@ const STUDIO_SFX_PRELOAD_ORDER: readonly StudioSoundId[] = [
   'sharingan-activate',
   'tsukuyomi-cast',
   'mangekyou-awaken',
+  'rinnegan-awaken',
   'susanoo-summon',
   'amaterasu-ignite',
   'izanagi-rewind',
@@ -31,8 +33,16 @@ const STUDIO_SFX_PRELOAD_ORDER: readonly StudioSoundId[] = [
   'binaural-genjutsu',
 ];
 
+const ADDED_MP3_ASSET_MAP: Partial<Record<StudioSoundId, string>> = {
+  'sharingan-activate': '/assets/audio/added/sharingan.mp3',
+  'mangekyou-awaken': '/assets/audio/added/mangekyou-sharingan.mp3',
+  'rinnegan-awaken': '/assets/audio/added/rinnegan.mp3',
+  'tsukuyomi-cast': '/assets/audio/added/genjutsu.mp3',
+  'ui-hover-chakra': '/assets/audio/added/interaction.mp3',
+};
+
 function getAudioUrl(id: StudioSoundId): string {
-  return `/audio/${id}.wav`;
+  return ADDED_MP3_ASSET_MAP[id] ?? `/assets/audio/${id}.wav`;
 }
 
 interface AmbientChannelState {
@@ -59,8 +69,12 @@ class TsukuyomiAudioEngine {
   private bufferCache = new Map<StudioSoundId, AudioBuffer>();
   private loadingPromises = new Map<StudioSoundId, Promise<AudioBuffer | null>>();
   private failedLoads = new Set<StudioSoundId>();
+  private htmlAudioCache = new Map<StudioSoundId, HTMLAudioElement>();
+  private htmlAudioErrorIds = new Set<StudioSoundId>();
   private preloadStarted = false;
+  private gestureListenersBound = false;
   private lastHoverTimeMs = 0;
+  private lastEyeSoundTimeMs = 0;
 
   private lastSettings: AudioSettings = {
     muted: false,
@@ -128,8 +142,37 @@ class TsukuyomiAudioEngine {
     return this.ctx;
   }
 
+  private bindFirstGestureUnlock(): void {
+    if (typeof window === 'undefined' || this.gestureListenersBound) return;
+    this.gestureListenersBound = true;
+
+    const handleFirstGesture = () => {
+      window.removeEventListener('pointerdown', handleFirstGesture);
+      window.removeEventListener('keydown', handleFirstGesture);
+      void this.unlock();
+    };
+
+    window.addEventListener('pointerdown', handleFirstGesture, {
+      once: true,
+      passive: true,
+    });
+    window.addEventListener('keydown', handleFirstGesture, {
+      once: true,
+      passive: true,
+    });
+  }
+
+  private hasUserActivation(): boolean {
+    if (typeof navigator === 'undefined') return true;
+    if (!('userActivation' in navigator) || !navigator.userActivation) {
+      return true;
+    }
+    return navigator.userActivation.hasBeenActive;
+  }
+
   public async unlock(): Promise<void> {
     if (typeof window === 'undefined') return;
+    this.bindFirstGestureUnlock();
     const ctx = this.ensureContext();
     if (!ctx) return;
 
@@ -145,10 +188,37 @@ class TsukuyomiAudioEngine {
     this.applyAmbientVolumes();
   }
 
+  private ensureHtmlAudio(id: StudioSoundId): HTMLAudioElement | null {
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') {
+      return null;
+    }
+    if (this.htmlAudioErrorIds.has(id) || this.failedLoads.has(id)) {
+      return null;
+    }
+
+    const cached = this.htmlAudioCache.get(id);
+    if (cached) return cached;
+
+    const audio = new Audio(getAudioUrl(id));
+    audio.preload = 'auto';
+    audio.addEventListener(
+      'error',
+      () => {
+        this.htmlAudioErrorIds.add(id);
+        this.htmlAudioCache.delete(id);
+      },
+      { once: true },
+    );
+    audio.load();
+    this.htmlAudioCache.set(id, audio);
+    return audio;
+  }
+
   private preloadAllAssets(): void {
     if (this.preloadStarted || typeof window === 'undefined') return;
     this.preloadStarted = true;
     for (const id of STUDIO_SFX_PRELOAD_ORDER) {
+      this.ensureHtmlAudio(id);
       void this.loadBuffer(id);
     }
   }
@@ -434,6 +504,7 @@ class TsukuyomiAudioEngine {
   public syncSettings(settings: AudioSettings): void {
     this.lastSettings = settings;
     if (typeof window === 'undefined') return;
+    this.bindFirstGestureUnlock();
 
     const anyAmbientActive =
       !settings.muted &&
@@ -477,17 +548,21 @@ class TsukuyomiAudioEngine {
     id: StudioSoundId,
     effectiveVolume: number,
   ): Promise<boolean> {
-    if (typeof window === 'undefined' || typeof Audio === 'undefined') {
-      return false;
-    }
-    if (this.failedLoads.has(id)) {
-      return false;
-    }
+    const cached = this.ensureHtmlAudio(id);
+    if (!cached) return false;
 
     try {
-      const audio = new Audio(getAudioUrl(id));
-      audio.volume = Math.min(1, Math.max(0, effectiveVolume));
-      await audio.play();
+      const canReuseTemplate =
+        cached.paused || cached.ended || id === 'ui-hover-chakra';
+      const player = canReuseTemplate
+        ? cached
+        : (cached.cloneNode(true) as HTMLAudioElement);
+
+      if (canReuseTemplate) {
+        player.currentTime = 0;
+      }
+      player.volume = Math.min(1, Math.max(0, effectiveVolume));
+      await player.play();
       return true;
     } catch {
       return false;
@@ -580,9 +655,15 @@ class TsukuyomiAudioEngine {
     sub.stop(now + 0.72);
   }
 
-  public async play(id: StudioSoundId, volumeScale = 1): Promise<void> {
+  private async playInternal(
+    id: StudioSoundId,
+    volumeScale = 1,
+  ): Promise<void> {
     if (typeof window === 'undefined') return;
     if (this.lastSettings.muted || this.lastSettings.sfxVolume <= 0) return;
+
+    this.bindFirstGestureUnlock();
+    this.preloadAllAssets();
 
     const effectiveVolume = Math.min(
       1,
@@ -624,8 +705,8 @@ class TsukuyomiAudioEngine {
       void this.loadBuffer(id);
     }
 
-    const playedWav = await this.tryPlayHtml5Audio(id, effectiveVolume);
-    if (playedWav) return;
+    const playedHtml = await this.tryPlayHtml5Audio(id, effectiveVolume);
+    if (playedHtml) return;
 
     if (ctx && this.masterGain) {
       if (ctx.state === 'suspended') {
@@ -641,19 +722,43 @@ class TsukuyomiAudioEngine {
     }
   }
 
+  public async play(id: StudioSoundId, volumeScale = 1): Promise<void> {
+    if (
+      id === 'mangekyou-awaken' &&
+      Date.now() - this.lastEyeSoundTimeMs < 90
+    ) {
+      return;
+    }
+    return this.playInternal(id, volumeScale);
+  }
+
+  public async playEyeSound(stage: EyeStage): Promise<void> {
+    this.lastEyeSoundTimeMs = Date.now();
+    if (stage === 'rinnegan') {
+      return this.playInternal('rinnegan-awaken');
+    }
+    if (stage === 'mangekyou' || stage === 'ems') {
+      return this.playInternal('mangekyou-awaken');
+    }
+    return this.playInternal('sharingan-activate');
+  }
+
   public playHover(): void {
     if (typeof window === 'undefined') return;
     if (this.lastSettings.muted || this.lastSettings.sfxVolume <= 0) return;
 
     const nowMs = Date.now();
-    if (nowMs - this.lastHoverTimeMs < 45) return;
+    if (nowMs - this.lastHoverTimeMs < 60) return;
     this.lastHoverTimeMs = nowMs;
 
-    if (!this.ctx || this.ctx.state !== 'running') {
+    this.bindFirstGestureUnlock();
+    this.preloadAllAssets();
+
+    if (!this.hasUserActivation() && (!this.ctx || this.ctx.state !== 'running')) {
       return;
     }
 
-    void this.play('ui-hover-chakra', 0.25);
+    void this.playInternal('ui-hover-chakra', 0.25);
   }
 
   public playClick(): void {
@@ -661,7 +766,7 @@ class TsukuyomiAudioEngine {
     if (this.lastSettings.muted || this.lastSettings.sfxVolume <= 0) return;
 
     void this.unlock();
-    void this.play('ui-click-seal', 0.45);
+    void this.playInternal('ui-click-seal', 0.45);
   }
 
   public async playSharinganActivate(): Promise<void> {

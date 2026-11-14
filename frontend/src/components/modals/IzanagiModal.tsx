@@ -8,6 +8,7 @@ import { IZANAGI_RESTORATION_MINUTES } from '@/constants/ranks';
 import { cn } from '@/lib/cn';
 import { canInvokeIzanagi } from '@/lib/gamification';
 import { useTsukuyomiStore } from '@/store/useTsukuyomiStore';
+import { CinematicModalBackdropEffects } from '@/components/modals/SusanooBreakModal';
 import type { IzanagiTriggerContext } from '@/types/tsukuyomi';
 
 function EyeStatusCard({
@@ -143,8 +144,11 @@ export function IzanagiModal({
           exit={{ opacity: 0 }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
           onClick={onClose}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/65 p-4 backdrop-blur-xl"
         >
+          <CinematicModalBackdropEffects
+            prefersReducedMotion={prefersReducedMotion}
+          />
           <motion.div
             key={`izanagi-dialog-${context}`}
             role="dialog"
@@ -171,7 +175,7 @@ export function IzanagiModal({
                 : { type: 'spring', stiffness: 290, damping: 25 }
             }
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg rounded-2xl border border-red-900/70 border-t-red-500/30 bg-[#09090B] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.95)] sm:p-7"
+            className="relative z-10 w-full max-w-lg rounded-2xl border border-red-500/30 bg-[#09090B]/80 p-6 shadow-[0_25px_70px_rgba(0,0,0,0.95),0_0_40px_rgba(220,38,38,0.2)] backdrop-blur-2xl sm:p-7"
           >
             <button
               type="button"

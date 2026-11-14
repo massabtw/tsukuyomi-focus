@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Image from 'next/image';
 import {
   AnimatePresence,
@@ -17,6 +17,7 @@ import {
   EYE_STAGES,
   EYE_STAGE_MAP,
   MANGEKYOU_VARIANTS,
+  MANGEKYOU_VARIANT_MAP,
 } from '@/constants/evolution';
 import { useAwwwardsParallax } from '@/hooks/useAwwwardsParallax';
 import { audioEngine } from '@/lib/audioEngine';
@@ -39,9 +40,26 @@ const MICRO_SPRING = {
 
 const FLASH_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
+const OBSIDIAN_SURFACE_CLASS =
+  'bg-gradient-to-b from-[#141418]/90 via-[#0C0C0F]/95 to-[#070709]/98 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] border border-white/[0.06] hover:border-red-500/30 transition-colors';
+
+const CUTIN_IMAGE_MAP: Record<MangekyouVariant, string> = {
+  itachi: '/assets/vfx/cutin-itachi-eyes.webp',
+  sasuke: '/assets/vfx/cutin-sasuke-eyes.webp',
+  madara: '/assets/vfx/cutin-madara-eyes.webp',
+  shisui: '/assets/vfx/cutin-itachi-eyes.webp',
+  obito: '/assets/vfx/cutin-madara-eyes.webp',
+};
+
 export function NakaShrineView() {
   const prefersReducedMotion = Boolean(useReducedMotion());
   const shrineRef = useRef<HTMLDivElement | null>(null);
+  const conduitRef = useRef<HTMLDivElement | null>(null);
+  const cutInTimerRef = useRef<number | null>(null);
+
+  const stoneNoiseId = useId();
+  const conduitGradId = useId();
+  const conduitGlowId = useId();
 
   const {
     chakra,
@@ -66,6 +84,18 @@ export function NakaShrineView() {
     variant: MangekyouVariant;
     nonce: number;
   } | null>(null);
+  const [cutIn, setCutIn] = useState<{
+    variant: MangekyouVariant;
+    nonce: number;
+  } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (cutInTimerRef.current !== null) {
+        window.clearTimeout(cutInTimerRef.current);
+      }
+    };
+  }, []);
 
   // Camera-descent scroll parallax: background stone tablet descends slower/positively while foreground rises subtly
   const { scrollYProgress } = useScroll({
@@ -81,6 +111,17 @@ export function NakaShrineView() {
     scrollYProgress,
     [0, 1],
     prefersReducedMotion ? ['0%', '0%'] : ['0%', '-6%'],
+  );
+
+  // Scroll-driven vertical rune conduit fill across the 7 stages
+  const { scrollYProgress: conduitScrollProgress } = useScroll({
+    target: conduitRef,
+    offset: ['start 78%', 'end 62%'],
+  });
+  const conduitPathLength = useTransform(
+    conduitScrollProgress,
+    [0, 1],
+    prefersReducedMotion ? [1, 1] : [0.06, 1],
   );
 
   // 4-layer cursor parallax for the Naka Altar showcase (MotionValues only, zero useState)
@@ -110,37 +151,175 @@ export function NakaShrineView() {
       stage,
       nonce: (prev?.nonce ?? 0) + 1,
     }));
-    // equipEyeStage plays audioEngine.play('mangekyou-awaken') in the store
+    void audioEngine.playEyeSound(stage);
     equipEyeStage(stage);
   }
 
   function handleSelectMangekyouVariant(variant: MangekyouVariant) {
-    setVariantFlash((prev) => ({
-      variant,
-      nonce: (prev?.nonce ?? 0) + 1,
-    }));
+    const nextNonce = (variantFlash?.nonce ?? 0) + 1;
+    setVariantFlash({ variant, nonce: nextNonce });
+    setCutIn({ variant, nonce: nextNonce });
+
+    if (cutInTimerRef.current !== null) {
+      window.clearTimeout(cutInTimerRef.current);
+    }
+    cutInTimerRef.current = window.setTimeout(() => {
+      setCutIn((curr) => (curr?.nonce === nextNonce ? null : curr));
+      cutInTimerRef.current = null;
+    }, 650);
+
     // setMangekyouVariant plays audioEngine.play('mangekyou-awaken') in the store
     setMangekyouVariant(variant);
   }
+
+  const activeCutInInfo = cutIn ? MANGEKYOU_VARIANT_MAP[cutIn.variant] : null;
 
   return (
     <div
       ref={shrineRef}
       className="relative mx-auto w-full max-w-6xl space-y-10 pb-16 pt-2"
     >
+      {/* Dramatic 650ms Manga Cut-In Overlay on Mangekyou Character Selection */}
+      <AnimatePresence>
+        {cutIn && activeCutInInfo ? (
+          <motion.div
+            key={`mangekyou-cutin-${cutIn.nonce}`}
+            aria-hidden="true"
+            initial={{ opacity: 0, scaleY: 0.25, scaleX: 1.06 }}
+            animate={
+              prefersReducedMotion
+                ? { opacity: [0, 1, 0] }
+                : {
+                    opacity: [0, 1, 1, 0],
+                    scaleY: [0.25, 1, 1, 0.9],
+                    scaleX: [1.06, 1, 1, 1.02],
+                  }
+            }
+            exit={{ opacity: 0 }}
+            transition={{
+              duration: 0.65,
+              times: prefersReducedMotion ? [0, 0.2, 1] : [0, 0.14, 0.8, 1],
+              ease: FLASH_EASE,
+              type: 'tween',
+            }}
+            className="pointer-events-none fixed inset-x-0 top-20 z-50 flex justify-center px-4 sm:top-24"
+          >
+            <div className="relative h-36 w-full max-w-2xl overflow-hidden rounded-xl border border-red-500/70 bg-black/95 shadow-[0_0_60px_rgba(220,38,38,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] sm:h-44">
+              {/* 2.5D Parallax Character Eyes Asset */}
+              <motion.div
+                initial={{ scale: 1.14, x: -12 }}
+                animate={
+                  prefersReducedMotion
+                    ? { scale: 1, x: 0 }
+                    : { scale: [1.14, 1.04, 1], x: [-12, 0, 10] }
+                }
+                transition={{
+                  duration: 0.65,
+                  times: [0, 0.5, 1],
+                  ease: 'easeOut',
+                  type: 'tween',
+                }}
+                style={{ willChange: 'transform' }}
+                className="absolute inset-0"
+              >
+                <Image
+                  src={CUTIN_IMAGE_MAP[cutIn.variant]}
+                  alt={`${activeCutInInfo.wielder} Mangekyou Cut-In`}
+                  fill
+                  unoptimized
+                  priority
+                  className="object-cover object-center mix-blend-screen [mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_98%)]"
+                />
+              </motion.div>
+
+              {/* Incandescent Entry Flash */}
+              {!prefersReducedMotion ? (
+                <motion.div
+                  initial={{ opacity: 0.95 }}
+                  animate={{ opacity: [0.95, 0.4, 0] }}
+                  transition={{
+                    duration: 0.42,
+                    times: [0, 0.25, 1],
+                    ease: 'easeOut',
+                    type: 'tween',
+                  }}
+                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.9)_0%,rgba(239,68,68,0.65)_45%,transparent_80%)] mix-blend-screen"
+                />
+              ) : null}
+
+              {/* Sweeping Red Light Beam Across Both Eyes */}
+              {!prefersReducedMotion ? (
+                <>
+                  <motion.div
+                    initial={{ x: '-110%', opacity: 0 }}
+                    animate={{
+                      x: ['-110%', '10%', '130%'],
+                      opacity: [0, 1, 0],
+                    }}
+                    transition={{
+                      duration: 0.58,
+                      delay: 0.04,
+                      times: [0, 0.45, 1],
+                      ease: [0.22, 1, 0.36, 1],
+                      type: 'tween',
+                    }}
+                    className="pointer-events-none absolute inset-y-0 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-red-500/80 to-transparent mix-blend-screen blur-[2px]"
+                  />
+                  <motion.div
+                    initial={{ x: '-65%', scaleX: 0.3, opacity: 0 }}
+                    animate={{
+                      x: ['-65%', '0%', '65%'],
+                      scaleX: [0.3, 1, 0.2],
+                      opacity: [0, 1, 0],
+                    }}
+                    transition={{
+                      duration: 0.52,
+                      delay: 0.06,
+                      times: [0, 0.48, 1],
+                      ease: 'easeInOut',
+                      type: 'tween',
+                    }}
+                    className="pointer-events-none absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 bg-gradient-to-r from-transparent via-red-300 to-transparent shadow-[0_0_18px_3px_rgba(239,68,68,0.95)] mix-blend-screen"
+                  />
+                </>
+              ) : null}
+
+              {/* Manga Cut-In Frame Vignette & Wielder Stamp */}
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/75 via-transparent to-black/75" />
+              <div className="pointer-events-none absolute bottom-2.5 right-4 flex items-center gap-2 rounded-md border border-red-500/40 bg-black/75 px-2.5 py-1 backdrop-blur-md">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.95)]" />
+                <span className="font-display text-xs font-semibold tracking-wider text-zinc-100 uppercase">
+                  {activeCutInInfo.wielder}
+                </span>
+                <span className="font-mono text-[10px] text-red-400">
+                  {activeCutInInfo.jutsuName}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
       {/* Stone Tablet Background Layer (Plano -2 / -1) */}
       <motion.div
         aria-hidden="true"
         style={{ y: bgStoneY }}
-        className="will-change-transform pointer-events-none absolute inset-x-0 -top-10 bottom-0 -z-10 overflow-hidden rounded-3xl border border-zinc-900/90 bg-gradient-to-b from-[#09090B] via-[#0c0c10] to-[#050507]"
+        className="will-change-transform pointer-events-none absolute inset-x-0 -top-10 bottom-0 -z-10 overflow-hidden rounded-3xl border border-white/[0.06] bg-gradient-to-b from-[#09090B] via-[#0c0c10] to-[#050507]"
       >
+        {/* Monumental Engraved Japanese Kanji Watermark: 神社 (Shrine) */}
+        <div className="pointer-events-none select-none absolute inset-x-0 top-12 flex justify-center overflow-hidden">
+          <span className="font-serif text-[12rem] font-black leading-none tracking-tight text-white opacity-[0.03] sm:text-[18rem] lg:text-[22rem]">
+            神社
+          </span>
+        </div>
+
         {/* Static feTurbulence stone micro-texture (opacity 0.03) */}
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.03]"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
-          <filter id="naka-tablet-stone-noise">
+          <filter id={stoneNoiseId}>
             <feTurbulence
               type="fractalNoise"
               baseFrequency="0.82"
@@ -151,7 +330,7 @@ export function NakaShrineView() {
           <rect
             width="100%"
             height="100%"
-            filter="url(#naka-tablet-stone-noise)"
+            filter={`url(#${stoneNoiseId})`}
           />
         </svg>
 
@@ -258,7 +437,10 @@ export function NakaShrineView() {
                   whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
                   transition={MICRO_SPRING}
                   onMouseEnter={() => audioEngine.playHover()}
-                  className="will-change-transform rounded-xl border border-zinc-800/90 bg-[#09090B]/85 px-4 py-3 transition-colors hover:border-red-900/60"
+                  className={cn(
+                    'will-change-transform rounded-xl px-4 py-3',
+                    OBSIDIAN_SURFACE_CLASS,
+                  )}
                 >
                   <span className="text-[11px] uppercase tracking-wider text-zinc-500">
                     Chakra Acumulado
@@ -275,7 +457,10 @@ export function NakaShrineView() {
                   whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
                   transition={MICRO_SPRING}
                   onMouseEnter={() => audioEngine.playHover()}
-                  className="will-change-transform rounded-xl border border-zinc-800/90 bg-[#09090B]/85 px-4 py-3 transition-colors hover:border-red-900/60"
+                  className={cn(
+                    'will-change-transform rounded-xl px-4 py-3',
+                    OBSIDIAN_SURFACE_CLASS,
+                  )}
                 >
                   <span className="text-[11px] uppercase tracking-wider text-zinc-500">
                     Estágio Máximo
@@ -292,7 +477,10 @@ export function NakaShrineView() {
                   whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
                   transition={MICRO_SPRING}
                   onMouseEnter={() => audioEngine.playHover()}
-                  className="will-change-transform rounded-xl border border-zinc-800/90 bg-[#09090B]/85 px-4 py-3 transition-colors hover:border-red-900/60"
+                  className={cn(
+                    'will-change-transform rounded-xl px-4 py-3',
+                    OBSIDIAN_SURFACE_CLASS,
+                  )}
                 >
                   <span className="text-[11px] uppercase tracking-wider text-zinc-500">
                     Recorde de Ofensiva
@@ -307,7 +495,12 @@ export function NakaShrineView() {
                 </motion.div>
               </div>
 
-              <div className="rounded-xl border border-zinc-800/80 bg-[#09090B]/75 p-4">
+              <div
+                className={cn(
+                  'rounded-xl p-4',
+                  OBSIDIAN_SURFACE_CLASS,
+                )}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-zinc-300">
                     {nextStageInfo.isMaxed || !nextStageInfo.nextDefinition
@@ -363,12 +556,82 @@ export function NakaShrineView() {
             ) : null}
           </div>
 
-          <div className="relative space-y-3">
-            {/* Etched vertical conduit */}
-            <div
+          <div ref={conduitRef} className="relative space-y-3">
+            {/* Scroll-Driven Engraving Rune Glow SVG Conduit */}
+            <svg
               aria-hidden="true"
-              className="pointer-events-none absolute bottom-6 left-9 top-6 hidden w-px bg-gradient-to-b from-red-900/70 via-zinc-800 to-red-950/40 md:block"
-            />
+              viewBox="0 0 24 800"
+              preserveAspectRatio="none"
+              className="pointer-events-none absolute bottom-8 left-[52px] top-8 hidden w-6 -translate-x-1/2 overflow-visible md:block"
+            >
+              <defs>
+                <linearGradient
+                  id={conduitGradId}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="0%" stopColor="#EF4444" stopOpacity="0.95" />
+                  <stop offset="50%" stopColor="#DC2626" stopOpacity="1" />
+                  <stop offset="100%" stopColor="#FCA5A5" stopOpacity="0.95" />
+                </linearGradient>
+                <filter
+                  id={conduitGlowId}
+                  x="-200%"
+                  y="-10%"
+                  width="500%"
+                  height="120%"
+                >
+                  <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              {/* Base carved stone channel */}
+              <path
+                d="M 12 0 L 12 800"
+                stroke="rgba(255, 255, 255, 0.08)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                fill="none"
+              />
+
+              {/* Etched Uchiha rune diamond notches */}
+              {[80, 200, 320, 440, 560, 680].map((yPos) => (
+                <path
+                  key={yPos}
+                  d={`M 12 ${yPos - 5} L 16 ${yPos} L 12 ${yPos + 5} L 8 ${yPos} Z`}
+                  fill="rgba(220, 38, 38, 0.16)"
+                  stroke="rgba(239, 68, 68, 0.25)"
+                  strokeWidth="0.75"
+                />
+              ))}
+
+              {/* Soft outer blood/chakra glow driven by scroll */}
+              <motion.path
+                d="M 12 0 L 12 800"
+                stroke={`url(#${conduitGradId})`}
+                strokeWidth="5"
+                strokeLinecap="round"
+                fill="none"
+                filter={`url(#${conduitGlowId})`}
+                style={{ pathLength: conduitPathLength, opacity: 0.45 }}
+              />
+
+              {/* Crisp core chakra engraving stroke driven by scroll */}
+              <motion.path
+                d="M 12 0 L 12 800"
+                stroke={`url(#${conduitGradId})`}
+                strokeWidth="2"
+                strokeLinecap="round"
+                fill="none"
+                style={{ pathLength: conduitPathLength }}
+              />
+            </svg>
 
             {EYE_STAGES.map((def, idx) => {
               const loreUnlocked = isEyeStageUnlocked(
@@ -412,12 +675,12 @@ export function NakaShrineView() {
                     }
                   }}
                   className={cn(
-                    'will-change-transform relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between sm:p-5',
+                    'will-change-transform relative flex flex-col gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5',
                     isEquipped
-                      ? 'obsidian-surface-crimson border-red-600/70'
+                      ? 'obsidian-surface-crimson border border-red-600/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] hover:border-red-500/80 transition-colors'
                       : unlocked
-                        ? 'obsidian-surface border-zinc-800/90 hover:border-red-900/60'
-                        : 'border-zinc-900 bg-[#09090B]/70 opacity-75',
+                        ? OBSIDIAN_SURFACE_CLASS
+                        : 'border border-white/[0.04] bg-gradient-to-b from-[#141418]/55 via-[#0C0C0F]/65 to-[#070709]/75 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04),0_25px_50px_-12px_rgba(0,0,0,0.95)] opacity-75 transition-colors',
                   )}
                 >
                   {/* Ocular flash ring animation on newly selected card */}
@@ -588,7 +851,7 @@ export function NakaShrineView() {
         {/* 5-Variant Mangekyou Selector */}
         <section
           aria-labelledby="mangekyou-variants-heading"
-          className="obsidian-surface rounded-2xl border border-zinc-800/90 border-t-white/[0.08] p-6 sm:p-8"
+          className={cn('rounded-2xl p-6 sm:p-8', OBSIDIAN_SURFACE_CLASS)}
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -652,12 +915,12 @@ export function NakaShrineView() {
                   onClick={() => handleSelectMangekyouVariant(info.variant)}
                   aria-pressed={isSelected}
                   className={cn(
-                    'will-change-transform group relative flex flex-col items-center rounded-xl border p-4 text-center transition-colors',
+                    'will-change-transform group relative flex flex-col items-center rounded-xl p-4 text-center',
                     isSelected
-                      ? 'border-red-600/80 bg-red-950/25 shadow-[0_0_24px_rgba(220,38,38,0.2)]'
+                      ? 'border border-red-600/80 bg-gradient-to-b from-red-950/45 via-[#160507]/95 to-[#080304]/98 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_0_24px_rgba(220,38,38,0.25)] transition-colors'
                       : isMangekyouUnlocked
-                        ? 'border-zinc-800 bg-[#09090B]/80 hover:border-red-900/70 hover:bg-[#121215]'
-                        : 'cursor-not-allowed border-zinc-900 bg-[#09090B]/40 opacity-55',
+                        ? OBSIDIAN_SURFACE_CLASS
+                        : 'cursor-not-allowed border border-zinc-900 bg-[#09090B]/40 opacity-55 transition-colors',
                   )}
                 >
                   {/* Card-level Ocular Flash Ring */}

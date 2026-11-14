@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { CalendarDays } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import {
   formatDisplayDatePtBr,
@@ -11,6 +13,9 @@ import {
 import { buildUchihaHeatmapDays } from '@/lib/gamification';
 import { useTsukuyomiStore } from '@/store/useTsukuyomiStore';
 import type { HeatmapDayCell } from '@/types/tsukuyomi';
+
+const OBSIDIAN_PANEL_CLASS =
+  'bg-gradient-to-b from-[#141418]/90 via-[#0C0C0F]/95 to-[#070709]/98 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] border border-white/[0.06] hover:border-red-500/30 transition-colors';
 
 const LEVEL_STYLES: Record<HeatmapDayCell['level'], string> = {
   0: 'bg-[#18181B] border-zinc-800/80',
@@ -59,6 +64,7 @@ interface WeekColumn {
 
 export function UchihaHeatmap() {
   const sessionLogs = useTsukuyomiStore((s) => s.sessionLogs);
+  const prefersReducedMotion = Boolean(useReducedMotion());
   const [hoveredCell, setHoveredCell] = useState<{
     cell: HeatmapDayCell;
     weekIndex: number;
@@ -116,9 +122,9 @@ export function UchihaHeatmap() {
   return (
     <section
       aria-labelledby="uchiha-heatmap-heading"
-      className="obsidian-surface relative rounded-2xl p-5 sm:p-6"
+      className={cn('relative rounded-2xl p-5 sm:p-6', OBSIDIAN_PANEL_CLASS)}
     >
-      <div className="flex flex-col gap-3 border-b border-zinc-800/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-white/[0.06] pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-red-500" aria-hidden="true" />
@@ -144,7 +150,10 @@ export function UchihaHeatmap() {
         {/* Live Inspector Readout (zero layout shift on hover/focus) */}
         <div
           aria-live="polite"
-          className="flex min-h-[36px] items-center rounded-xl border border-zinc-800/90 bg-[#09090B]/90 px-3 py-1.5 text-xs"
+          className={cn(
+            'flex min-h-[36px] items-center rounded-xl px-3 py-1.5 text-xs',
+            OBSIDIAN_PANEL_CLASS,
+          )}
         >
           {hoveredCell ? (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
@@ -218,6 +227,15 @@ export function UchihaHeatmap() {
 
                     const isSelected =
                       hoveredCell?.cell.date === cell.date;
+                    const isNeighbor =
+                      hoveredCell !== null &&
+                      !(
+                        hoveredCell.weekIndex === weekIdx &&
+                        hoveredCell.dayIndex === dayIdx
+                      ) &&
+                      Math.abs(weekIdx - hoveredCell.weekIndex) <= 1 &&
+                      Math.abs(dayIdx - hoveredCell.dayIndex) <= 1;
+
                     const tooltipHorizontalClass =
                       weekIdx < 7
                         ? 'left-0'
@@ -231,13 +249,14 @@ export function UchihaHeatmap() {
                       <div key={cell.date} className="relative">
                         <button
                           type="button"
-                          onMouseEnter={() =>
+                          onMouseEnter={() => {
+                            audioEngine.playHover();
                             setHoveredCell({
                               cell,
                               weekIndex: weekIdx,
                               dayIndex: dayIdx,
-                            })
-                          }
+                            });
+                          }}
                           onMouseLeave={() => setHoveredCell(null)}
                           onFocus={() =>
                             setHoveredCell({
@@ -249,16 +268,39 @@ export function UchihaHeatmap() {
                           onBlur={() => setHoveredCell(null)}
                           aria-label={`${formatDisplayDatePtBr(cell.date)}: ${cell.minutes} minutos focados, ${cell.chakra} Chakra obtido`}
                           className={cn(
-                            'block h-3.5 w-3.5 rounded-[3px] border transition-transform duration-150 hover:scale-125 focus-visible:scale-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400',
+                            'relative block h-3.5 w-3.5 rounded-[3px] border transition-all duration-150 hover:z-20 hover:scale-125 focus-visible:z-20 focus-visible:scale-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400',
                             LEVEL_STYLES[cell.level],
+                            isNeighbor &&
+                              'z-10 scale-110 border-red-400/75 ring-1 ring-red-500/45 shadow-[0_0_10px_rgba(239,68,68,0.55)]',
+                            isNeighbor && cell.level === 0 && 'bg-[#2A0E12]',
                           )}
-                        />
+                        >
+                          {cell.level === 4 && !prefersReducedMotion ? (
+                            <motion.span
+                              aria-hidden="true"
+                              animate={{
+                                opacity: [0.45, 1, 0.45],
+                                scale: [0.96, 1.14, 0.96],
+                              }}
+                              transition={{
+                                duration: 2.2,
+                                delay: (weekIdx + dayIdx) * 0.06,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                                type: 'tween',
+                              }}
+                              style={{ willChange: 'transform, opacity' }}
+                              className="pointer-events-none absolute -inset-px rounded-[3px] bg-red-400/55 shadow-[0_0_10px_rgba(239,68,68,0.85)]"
+                            />
+                          ) : null}
+                        </button>
 
                         {isSelected ? (
                           <div
                             role="tooltip"
                             className={cn(
-                              'pointer-events-none absolute z-30 w-44 rounded-lg border border-zinc-700/80 bg-[#09090B]/95 px-2.5 py-2 text-[11px] shadow-[0_12px_28px_rgba(0,0,0,0.95)] backdrop-blur-md',
+                              'pointer-events-none absolute z-30 w-44 rounded-lg px-2.5 py-2 text-[11px]',
+                              OBSIDIAN_PANEL_CLASS,
                               tooltipHorizontalClass,
                               tooltipVerticalClass,
                             )}
@@ -291,7 +333,7 @@ export function UchihaHeatmap() {
       </div>
 
       {/* Legend */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800/70 pt-3 text-[11px] text-zinc-500">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-3 text-[11px] text-zinc-500">
         <span>Escala de concentração diária</span>
         <div className="flex items-center gap-2">
           <span>Menos</span>

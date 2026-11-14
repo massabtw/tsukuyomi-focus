@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import {
   motion,
   useMotionValue,
@@ -15,6 +16,7 @@ import {
   useTsukuyomiCastNonce,
   useTsukuyomiStore,
 } from '@/store/useTsukuyomiStore';
+import type { MangekyouVariant } from '@/types/tsukuyomi';
 
 const BACKDROP_SPRING = {
   stiffness: 90,
@@ -27,29 +29,178 @@ const WILL_CHANGE_TRANSFORM_OPACITY = {
   willChange: 'transform, opacity',
 } as const;
 
-interface CrowVector {
-  id: string;
-  midX: string;
-  midY: string;
-  targetX: string;
-  targetY: string;
-  delay: number;
-  startRotate: number;
-  endRotate: number;
+const VFX_BLEND_MASK_CLASS =
+  'pointer-events-none select-none mix-blend-screen [mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_98%)]';
+
+interface CanvasChakraRgb {
+  r: number;
+  g: number;
+  b: number;
+  brightR: number;
+  brightG: number;
+  brightB: number;
 }
 
-const CROW_FLOCK_VECTORS: readonly CrowVector[] = [
-  { id: 'crow-1', midX: '-18vw', midY: '-14vh', targetX: '-42vw', targetY: '-34vh', delay: 0.0, startRotate: -18, endRotate: -32 },
-  { id: 'crow-2', midX: '16vw', midY: '-16vh', targetX: '38vw', targetY: '-36vh', delay: 0.03, startRotate: 14, endRotate: 28 },
-  { id: 'crow-3', midX: '-21vw', midY: '5vh', targetX: '-48vw', targetY: '12vh', delay: 0.06, startRotate: -26, endRotate: -40 },
-  { id: 'crow-4', midX: '20vw', midY: '7vh', targetX: '46vw', targetY: '16vh', delay: 0.04, startRotate: 22, endRotate: 38 },
-  { id: 'crow-5', midX: '-8vw', midY: '-20vh', targetX: '-18vw', targetY: '-46vh', delay: 0.08, startRotate: -8, endRotate: -16 },
-  { id: 'crow-6', midX: '7vw', midY: '-19vh', targetX: '16vw', targetY: '-44vh', delay: 0.05, startRotate: 10, endRotate: 22 },
-  { id: 'crow-7', midX: '-14vw', midY: '16vh', targetX: '-32vw', targetY: '38vh', delay: 0.09, startRotate: -35, endRotate: -50 },
-  { id: 'crow-8', midX: '15vw', midY: '18vh', targetX: '34vw', targetY: '40vh', delay: 0.07, startRotate: 28, endRotate: 44 },
-  { id: 'crow-9', midX: '-3vw', midY: '19vh', targetX: '-8vw', targetY: '42vh', delay: 0.11, startRotate: -12, endRotate: -20 },
-  { id: 'crow-10', midX: '5vw', midY: '-8vh', targetX: '12vw', targetY: '-18vh', delay: 0.02, startRotate: 6, endRotate: 18 },
+const CHAKRA_RGB_MAP: Record<MangekyouVariant, CanvasChakraRgb> = {
+  itachi: { r: 220, g: 38, b: 38, brightR: 239, brightG: 68, brightB: 68 },
+  sasuke: { r: 139, g: 92, b: 246, brightR: 167, brightG: 139, brightB: 250 },
+  shisui: { r: 16, g: 185, b: 129, brightR: 52, brightG: 211, brightB: 153 },
+  madara: { r: 37, g: 99, b: 235, brightR: 96, brightG: 165, brightB: 250 },
+  obito: { r: 14, g: 165, b: 233, brightR: 56, brightG: 189, brightB: 248 },
+};
+
+const CROW_BURST_COUNT = 22;
+const MAX_ACTIVE_CROWS = 66;
+
+interface DarkEyeZone {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+// Outer screen margins so ambient crow eyes lurk in the dark perimeter without overlapping center HUD
+const OUTER_DARK_EYE_ZONES: readonly DarkEyeZone[] = [
+  { minX: 3, maxX: 9, minY: 16, maxY: 32 },
+  { minX: 2.5, maxX: 8, minY: 38, maxY: 60 },
+  { minX: 3, maxX: 9.5, minY: 66, maxY: 84 },
+  { minX: 91, maxX: 97, minY: 16, maxY: 32 },
+  { minX: 92, maxX: 97.5, minY: 38, maxY: 60 },
+  { minX: 90.5, maxX: 97, minY: 66, maxY: 84 },
+  { minX: 11, maxX: 22, minY: 9, maxY: 15 },
+  { minX: 78, maxX: 89, minY: 9, maxY: 15 },
+  { minX: 12, maxX: 24, minY: 84, maxY: 91 },
+  { minX: 76, maxX: 88, minY: 84, maxY: 91 },
 ];
+
+interface ForegroundFeatherTrajectory {
+  startX: string;
+  midX: string;
+  endX: string;
+  startY: string;
+  midY: string;
+  endY: string;
+  startRot: number;
+  midRot: number;
+  endRot: number;
+}
+
+const FOREGROUND_FEATHER_TRAJECTORIES: readonly ForegroundFeatherTrajectory[] = [
+  {
+    startX: '-25vw',
+    midX: '48vw',
+    endX: '125vw',
+    startY: '14vh',
+    midY: '42vh',
+    endY: '76vh',
+    startRot: -28,
+    midRot: -8,
+    endRot: 18,
+  },
+  {
+    startX: '120vw',
+    midX: '45vw',
+    endX: '-28vw',
+    startY: '22vh',
+    midY: '54vh',
+    endY: '84vh',
+    startRot: 162,
+    midRot: 188,
+    endRot: 214,
+  },
+  {
+    startX: '-22vw',
+    midX: '50vw',
+    endX: '122vw',
+    startY: '74vh',
+    midY: '46vh',
+    endY: '16vh',
+    startRot: -48,
+    midRot: -24,
+    endRot: 4,
+  },
+];
+
+const CROW_EYE_TRIGGER_RADIUS_SQ = 105 * 105;
+
+interface CrowEyeFeather {
+  id: string;
+  midX: number;
+  midY: number;
+  endX: number;
+  endY: number;
+  startRotate: number;
+  midRotate: number;
+  endRotate: number;
+  lengthScale: number;
+}
+
+interface CrowEyePair {
+  id: string;
+  zoneIndex: number;
+  xPct: number;
+  yPct: number;
+  tiltDeg: number;
+  status: 'watching' | 'dissolving';
+  spawnedAt: number;
+  dissolvedAt: number;
+  feathers: CrowEyeFeather[];
+}
+
+let crowPairCounter = 0;
+
+function randomBetween(min: number, max: number): number {
+  return min + Math.random() * (max - min);
+}
+
+function createCrowEyePair(occupiedZones?: Set<number>): CrowEyePair {
+  const availableIndices = OUTER_DARK_EYE_ZONES.map((_, idx) => idx).filter(
+    (idx) => !occupiedZones || !occupiedZones.has(idx),
+  );
+  const pool =
+    availableIndices.length > 0
+      ? availableIndices
+      : OUTER_DARK_EYE_ZONES.map((_, idx) => idx);
+  const zoneIndex = pool[Math.floor(Math.random() * pool.length)];
+  const zone = OUTER_DARK_EYE_ZONES[zoneIndex];
+
+  crowPairCounter += 1;
+  const pairId = `crow-eye-${crowPairCounter}`;
+  const featherCount = Math.random() > 0.45 ? 3 : 2;
+  const feathers: CrowEyeFeather[] = Array.from(
+    { length: featherCount },
+    (_, index) => {
+      const dirAngle =
+        ((index / featherCount) * Math.PI * 1.4 - Math.PI * 0.7) +
+        randomBetween(-0.35, 0.35);
+      const speedDist = randomBetween(46, 86);
+      const startRotate = randomBetween(-45, 45);
+      return {
+        id: `${pairId}-f-${index}`,
+        midX: Math.cos(dirAngle) * speedDist * 0.55,
+        midY: Math.sin(dirAngle) * speedDist * 0.35 - 10,
+        endX: Math.cos(dirAngle) * speedDist,
+        endY: Math.sin(dirAngle) * speedDist + 36,
+        startRotate,
+        midRotate: startRotate + randomBetween(-55, 55),
+        endRotate: startRotate + randomBetween(-120, 120),
+        lengthScale: randomBetween(0.85, 1.15),
+      };
+    },
+  );
+
+  return {
+    id: pairId,
+    zoneIndex,
+    xPct: randomBetween(zone.minX, zone.maxX),
+    yPct: randomBetween(zone.minY, zone.maxY),
+    tiltDeg: randomBetween(-8, 8),
+    status: 'watching',
+    spawnedAt: Date.now(),
+    dissolvedAt: 0,
+    feathers,
+  };
+}
 
 interface FeatherParticle {
   x: number;
@@ -64,6 +215,7 @@ interface FeatherParticle {
   tumbleSpeed: number;
   swayAmp: number;
   alpha: number;
+  camber: number;
 }
 
 interface EmberParticle {
@@ -74,27 +226,50 @@ interface EmberParticle {
   driftPhase: number;
   driftSpeed: number;
   alpha: number;
-  crimsonBright: boolean;
+  chakraBright: boolean;
 }
 
-function createFeather(width: number, height: number, randomY: boolean): FeatherParticle {
+interface CrowParticle {
+  x: number;
+  y: number;
+  angle: number;
+  speed: number;
+  curlRate: number;
+  scale: number;
+  flapPhase: number;
+  flapSpeed: number;
+  age: number;
+  maxAge: number;
+  wingSpan: number;
+}
+
+function createFeather(
+  width: number,
+  height: number,
+  randomY: boolean,
+): FeatherParticle {
   return {
     x: Math.random() * width,
-    y: randomY ? Math.random() * height : -20 - Math.random() * 80,
-    vx: -12 + Math.random() * 24,
-    vy: 22 + Math.random() * 28,
-    length: 12 + Math.random() * 14,
-    width: 4 + Math.random() * 4,
+    y: randomY ? Math.random() * height : -24 - Math.random() * 80,
+    vx: -14 + Math.random() * 28,
+    vy: 24 + Math.random() * 26,
+    length: 13 + Math.random() * 14,
+    width: 4.5 + Math.random() * 4,
     rot: Math.random() * Math.PI * 2,
-    vRot: -0.7 + Math.random() * 1.4,
+    vRot: -0.75 + Math.random() * 1.5,
     tumblePhase: Math.random() * Math.PI * 2,
-    tumbleSpeed: 1.4 + Math.random() * 1.8,
+    tumbleSpeed: 1.4 + Math.random() * 1.9,
     swayAmp: 18 + Math.random() * 26,
-    alpha: 0.45 + Math.random() * 0.4,
+    alpha: 0.48 + Math.random() * 0.4,
+    camber: (Math.random() > 0.5 ? 1 : -1) * (0.14 + Math.random() * 0.14),
   };
 }
 
-function createEmber(width: number, height: number, randomY: boolean): EmberParticle {
+function createEmber(
+  width: number,
+  height: number,
+  randomY: boolean,
+): EmberParticle {
   return {
     x: Math.random() * width,
     y: randomY ? Math.random() * height : height + 10 + Math.random() * 60,
@@ -102,41 +277,407 @@ function createEmber(width: number, height: number, randomY: boolean): EmberPart
     size: 1.4 + Math.random() * 2.2,
     driftPhase: Math.random() * Math.PI * 2,
     driftSpeed: 1.2 + Math.random() * 2.0,
-    alpha: 0.3 + Math.random() * 0.65,
-    crimsonBright: Math.random() > 0.45,
+    alpha: 0.32 + Math.random() * 0.62,
+    chakraBright: Math.random() > 0.42,
   };
 }
 
-function CrowSilhouetteSvg() {
+function spawnCrowBurst(
+  crows: CrowParticle[],
+  width: number,
+  height: number,
+): void {
+  const cx = width * 0.5;
+  const cy = height * 0.5;
+  for (let i = 0; i < CROW_BURST_COUNT; i++) {
+    if (crows.length >= MAX_ACTIVE_CROWS) {
+      crows.shift();
+    }
+    const baseAngle = (i / CROW_BURST_COUNT) * Math.PI * 2;
+    crows.push({
+      x: cx + randomBetween(-14, 14),
+      y: cy + randomBetween(-14, 14),
+      angle: baseAngle + randomBetween(-0.22, 0.22),
+      speed: randomBetween(280, 580),
+      curlRate: randomBetween(-0.52, 0.52),
+      scale: 0.25,
+      flapPhase: randomBetween(0, Math.PI * 2),
+      flapSpeed: randomBetween(12, 16),
+      age: 0,
+      maxAge: 2.3,
+      wingSpan: randomBetween(24, 34),
+    });
+  }
+}
+
+function updateAndDrawEmbers(
+  ctx: CanvasRenderingContext2D,
+  embers: EmberParticle[],
+  activeLimit: number,
+  dt: number,
+  width: number,
+  height: number,
+  active: boolean,
+  rgb: CanvasChakraRgb,
+): void {
+  for (let i = 0; i < activeLimit; i++) {
+    const ember = embers[i];
+    ember.driftPhase += ember.driftSpeed * dt;
+    ember.y += ember.vy * (active ? 1.15 : 0.75) * dt;
+    ember.x += Math.sin(ember.driftPhase) * 14 * dt;
+
+    if (ember.y < -16) {
+      embers[i] = createEmber(width, height, false);
+      continue;
+    }
+
+    const heightRatio = Math.max(0, Math.min(1, ember.y / Math.max(1, height)));
+    const fade = Math.sin(heightRatio * Math.PI);
+    const alpha = ember.alpha * fade * (active ? 0.92 : 0.42);
+    if (alpha <= 0.02) continue;
+
+    const r = ember.chakraBright ? rgb.brightR : rgb.r;
+    const g = ember.chakraBright ? rgb.brightG : rgb.g;
+    const b = ember.chakraBright ? rgb.brightB : rgb.b;
+
+    if (ember.chakraBright && active) {
+      ctx.beginPath();
+      ctx.arc(ember.x, ember.y, ember.size * 2.2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${(alpha * 0.24).toFixed(3)})`;
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(ember.x, ember.y, ember.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+    ctx.fill();
+  }
+}
+
+function updateAndDrawFeathers(
+  ctx: CanvasRenderingContext2D,
+  feathers: FeatherParticle[],
+  activeLimit: number,
+  dt: number,
+  tSec: number,
+  width: number,
+  height: number,
+  active: boolean,
+  rgb: CanvasChakraRgb,
+): void {
+  const gustBase =
+    Math.sin(tSec * 0.42) * 34 +
+    Math.sin(tSec * 1.15 + 1.4) * 18 +
+    Math.cos(tSec * 0.19) * 22;
+
+  for (let i = 0; i < activeLimit; i++) {
+    const f = feathers[i];
+    f.tumblePhase += f.tumbleSpeed * dt;
+
+    const localEddy =
+      Math.sin(tSec * 0.9 + f.y * 0.006 + f.x * 0.003) * 22;
+    const windX = (gustBase + localEddy) * (active ? 1.15 : 0.72);
+    const targetWind = windX + Math.sin(f.tumblePhase * 0.85) * f.swayAmp;
+
+    // Aerodynamic drag & vertical lift flutter
+    f.vx += (targetWind - f.vx) * 1.8 * dt;
+    const tumbleScale = Math.cos(f.tumblePhase);
+    const broadside = Math.abs(tumbleScale);
+    const liftFlutter =
+      broadside * Math.sin(f.tumblePhase * 1.7) * 16 +
+      Math.abs(windX) * 0.12 * broadside;
+    const effectiveVy = Math.max(8, f.vy * (active ? 1.0 : 0.72) - liftFlutter);
+
+    f.x += f.vx * dt;
+    f.y += effectiveVy * dt;
+    const aeroTilt = Math.max(-0.45, Math.min(0.45, f.vx * 0.004));
+    f.rot += (f.vRot + aeroTilt * 0.6) * dt;
+
+    if (f.y > height + 40) {
+      feathers[i] = createFeather(width, height, false);
+      continue;
+    }
+    if (f.x < -50) f.x = width + 40;
+    if (f.x > width + 50) f.x = -40;
+
+    const absTumble = Math.max(0.18, broadside);
+    const alpha = f.alpha * (active ? 1 : 0.46);
+    const curveShift = f.length * f.camber;
+
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.rot);
+    ctx.scale(tumbleScale < 0 ? -absTumble : absTumble, 1);
+
+    // Crisp curved crow feather vane with natural barb notch
+    ctx.beginPath();
+    ctx.moveTo(0, -f.length * 0.56);
+    ctx.bezierCurveTo(
+      f.width * 1.05 + curveShift * 0.35,
+      -f.length * 0.24,
+      f.width * 0.95 + curveShift * 0.55,
+      f.length * 0.14,
+      f.width * 0.48 + curveShift * 0.4,
+      f.length * 0.42,
+    );
+    ctx.lineTo(f.width * 0.22 + curveShift * 0.3, f.length * 0.35);
+    ctx.lineTo(f.width * 0.32 + curveShift * 0.25, f.length * 0.52);
+    ctx.lineTo(curveShift * 0.1, f.length * 0.62);
+    ctx.bezierCurveTo(
+      -f.width * 0.95 + curveShift * 0.15,
+      f.length * 0.28,
+      -f.width * 0.9 + curveShift * 0.25,
+      -f.length * 0.18,
+      0,
+      -f.length * 0.56,
+    );
+    ctx.closePath();
+
+    ctx.fillStyle = `rgba(6, 6, 9, ${alpha.toFixed(3)})`;
+    ctx.fill();
+
+    ctx.lineWidth = 0.85;
+    ctx.strokeStyle = active
+      ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${(alpha * 0.56).toFixed(3)})`
+      : `rgba(82, 82, 91, ${(alpha * 0.38).toFixed(3)})`;
+    ctx.stroke();
+
+    // Curved central rachis quill line
+    ctx.beginPath();
+    ctx.moveTo(0, -f.length * 0.54);
+    ctx.quadraticCurveTo(
+      curveShift * 0.35,
+      0,
+      curveShift * 0.08,
+      f.length * 0.72,
+    );
+    ctx.lineWidth = 0.75;
+    ctx.strokeStyle = active
+      ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${(alpha * 0.46).toFixed(3)})`
+      : `rgba(113, 113, 122, ${(alpha * 0.35).toFixed(3)})`;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+function updateAndDrawCrows(
+  ctx: CanvasRenderingContext2D,
+  crows: CrowParticle[],
+  dt: number,
+  width: number,
+  height: number,
+  rgb: CanvasChakraRgb,
+): void {
+  if (crows.length === 0) return;
+
+  const cx = width * 0.5;
+  const cy = height * 0.5;
+  const maxRadius = Math.hypot(cx, cy) + 90;
+
+  for (let i = crows.length - 1; i >= 0; i--) {
+    const crow = crows[i];
+    crow.age += dt;
+    crow.flapPhase += crow.flapSpeed * dt;
+    crow.angle += crow.curlRate * Math.max(0.25, 1 - crow.age * 0.55) * dt;
+    crow.x += Math.cos(crow.angle) * crow.speed * dt;
+    crow.y += Math.sin(crow.angle) * crow.speed * dt;
+
+    const dist = Math.hypot(crow.x - cx, crow.y - cy);
+    const distRatio = Math.min(1, dist / Math.max(1, maxRadius));
+    crow.scale = 0.25 + (1.8 - 0.25) * Math.pow(distRatio, 0.85);
+
+    if (distRatio >= 1 || crow.age >= crow.maxAge) {
+      crows.splice(i, 1);
+      continue;
+    }
+
+    const fadeIn = Math.min(1, crow.age / 0.08);
+    const edgeFade =
+      distRatio < 0.72 ? 1 : Math.max(0, 1 - (distRatio - 0.72) / 0.28);
+    const alpha = fadeIn * edgeFade * 0.96;
+    if (alpha <= 0.02) continue;
+
+    const flap = Math.sin(crow.flapPhase);
+    const fold = Math.cos(crow.flapPhase);
+    const w = crow.wingSpan;
+    const wingTipX = w * (0.82 + 0.18 * fold);
+    const wingTipY = flap * w * 0.52;
+    const wristX = w * 0.44;
+    const wristY = flap * w * 0.28 - w * 0.14;
+
+    ctx.save();
+    ctx.translate(crow.x, crow.y);
+    ctx.rotate(crow.angle + Math.PI * 0.5);
+    ctx.scale(crow.scale, crow.scale);
+
+    // Real-time wing-flapping bezier crow silhouette
+    ctx.beginPath();
+    ctx.moveTo(0, -w * 0.58); // Beak tip
+    ctx.lineTo(w * 0.08, -w * 0.36); // Right head
+    ctx.quadraticCurveTo(w * 0.12, -w * 0.22, w * 0.14, -w * 0.14); // Right shoulder
+    ctx.bezierCurveTo(
+      wristX,
+      wristY,
+      wingTipX * 0.88,
+      wingTipY - w * 0.08,
+      wingTipX,
+      wingTipY,
+    );
+    ctx.bezierCurveTo(
+      w * 0.62,
+      wingTipY + w * 0.2,
+      w * 0.28,
+      w * 0.16,
+      w * 0.1,
+      w * 0.22,
+    );
+    // Fanned tail
+    ctx.lineTo(w * 0.16, w * 0.54);
+    ctx.lineTo(0, w * 0.45);
+    ctx.lineTo(-w * 0.16, w * 0.54);
+    ctx.lineTo(-w * 0.1, w * 0.22);
+    // Left wing
+    ctx.bezierCurveTo(
+      -w * 0.28,
+      w * 0.16,
+      -w * 0.62,
+      wingTipY + w * 0.2,
+      -wingTipX,
+      wingTipY,
+    );
+    ctx.bezierCurveTo(
+      -wingTipX * 0.88,
+      wingTipY - w * 0.08,
+      -wristX,
+      wristY,
+      -w * 0.14,
+      -w * 0.14,
+    );
+    ctx.quadraticCurveTo(-w * 0.12, -w * 0.22, -w * 0.08, -w * 0.36);
+    ctx.closePath();
+
+    ctx.fillStyle = `rgba(4, 4, 7, ${alpha.toFixed(3)})`;
+    ctx.fill();
+
+    ctx.lineWidth = 1.0;
+    ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${(alpha * 0.52).toFixed(3)})`;
+    ctx.stroke();
+
+    // Glowing chakra-tinted eyes
+    ctx.shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha.toFixed(3)})`;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = `rgba(${rgb.brightR}, ${rgb.brightG}, ${rgb.brightB}, ${alpha.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(-w * 0.036, -w * 0.38, 1.45, 0, Math.PI * 2);
+    ctx.arc(w * 0.036, -w * 0.38, 1.45, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+function DissolveFeatherSvg() {
   return (
     <svg
-      viewBox="0 0 120 80"
+      viewBox="0 0 24 44"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="h-20 w-28 drop-shadow-[0_0_12px_rgba(220,38,38,0.45)]"
+      className="h-7 w-4 drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]"
     >
       <path
-        d="M 60 36 C 46 18 22 8 4 14 C 16 24 28 32 42 40 C 30 46 20 56 16 68 C 30 60 44 54 56 50 L 60 66 L 65 50 C 77 54 90 60 104 68 C 100 56 90 46 78 40 C 92 32 104 24 116 14 C 98 8 74 18 60 36 Z"
+        d="M 12 2 C 17 10 20 20 16 32 L 12 37 L 7 31 C 4 21 7 11 12 2 Z"
         fill="#050507"
-        stroke="#DC2626"
-        strokeWidth="1.2"
-        strokeOpacity="0.65"
+        stroke="var(--chakra-primary, #991B1B)"
+        strokeOpacity="0.6"
+        strokeWidth="0.9"
       />
-      <path d="M 56 34 L 60 22 L 65 34 L 60 44 Z" fill="#050507" />
-      <circle cx="58.5" cy="29" r="1.2" fill="#EF4444" />
-      <circle cx="61.5" cy="29" r="1.2" fill="#EF4444" />
+      <line
+        x1="12"
+        y1="4"
+        x2="12"
+        y2="42"
+        stroke="var(--chakra-primary, #7F1D1D)"
+        strokeOpacity="0.65"
+        strokeWidth="0.9"
+      />
     </svg>
   );
 }
 
-export function GenjutsuBackdrop() {
-  const rawId = useId();
-  const safeId = rawId.replace(/:/g, '');
-  const moonCoronaId = `blood-moon-corona-${safeId}`;
-  const moonDiscId = `blood-moon-disc-${safeId}`;
+function ForegroundGiantFeatherSvg() {
+  return (
+    <svg
+      viewBox="0 0 240 90"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="h-28 w-72 sm:h-32 sm:w-80"
+    >
+      <path
+        d="M 8 48 C 46 24 106 12 178 24 C 204 29 224 38 234 45 C 216 56 188 67 148 70 C 98 74 52 66 22 54 L 8 48 Z"
+        fill="#040406"
+        stroke="var(--chakra-primary, #7F1D1D)"
+        strokeOpacity="0.45"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M 0 50 C 66 47 146 43 230 45"
+        stroke="var(--chakra-primary, #450A0A)"
+        strokeOpacity="0.65"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
+function MistTile({
+  intense,
+  variant = 'back',
+}: {
+  intense: boolean;
+  variant?: 'back' | 'front';
+}) {
+  const isFront = variant === 'front';
+  return (
+    <div className="relative h-full w-1/2 shrink-0">
+      <div
+        className="absolute inset-0"
+        style={{
+          background: isFront
+            ? 'linear-gradient(180deg, transparent 0%, rgba(5, 5, 8, 0.4) 48%, rgba(0, 0, 0, 0.92) 100%)'
+            : 'linear-gradient(180deg, transparent 0%, rgba(7, 7, 10, 0.35) 55%, rgba(0, 0, 0, 0.88) 100%)',
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          opacity: intense ? (isFront ? 0.95 : 0.85) : isFront ? 0.7 : 0.6,
+          background: isFront
+            ? 'radial-gradient(ellipse 30% 62% at 15% 84%, rgba(255, 255, 255, 0.055) 0%, transparent 70%), radial-gradient(ellipse 34% 66% at 46% 80%, rgba(255, 255, 255, 0.048) 0%, transparent 72%), radial-gradient(ellipse 28% 58% at 78% 86%, rgba(255, 255, 255, 0.05) 0%, transparent 68%)'
+            : 'radial-gradient(ellipse 34% 68% at 20% 82%, rgba(255, 255, 255, 0.045) 0%, transparent 72%), radial-gradient(ellipse 38% 74% at 54% 76%, rgba(255, 255, 255, 0.038) 0%, transparent 74%), radial-gradient(ellipse 32% 65% at 84% 84%, rgba(255, 255, 255, 0.042) 0%, transparent 70%)',
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          opacity: intense ? (isFront ? 0.34 : 0.28) : isFront ? 0.2 : 0.16,
+          background: isFront
+            ? 'radial-gradient(ellipse 32% 64% at 18% 88%, var(--chakra-glow, rgba(220, 38, 38, 0.38)) 0%, transparent 72%), radial-gradient(ellipse 36% 68% at 64% 86%, var(--chakra-glow, rgba(220, 38, 38, 0.38)) 0%, transparent 72%)'
+            : 'radial-gradient(ellipse 36% 72% at 24% 86%, var(--chakra-glow, rgba(220, 38, 38, 0.38)) 0%, transparent 74%), radial-gradient(ellipse 40% 70% at 72% 88%, var(--chakra-glow, rgba(220, 38, 38, 0.38)) 0%, transparent 74%)',
+        }}
+      />
+    </div>
+  );
+}
+
+export function GenjutsuBackdrop() {
   const isTsukuyomiMode = useIsTsukuyomiMode();
   const { status: timerStatus } = useTimerCore();
+  const currentMinuteBucket = useTsukuyomiStore((s) =>
+    Math.floor(s.timer.remainingSeconds / 60),
+  );
+  const mangekyouVariant = useTsukuyomiStore((s) => s.mangekyouVariant);
   const izanagiFlashNonce = useTsukuyomiStore((s) => s.izanagiFlashNonce);
   const tsukuyomiCastNonce = useTsukuyomiCastNonce();
   const prefersReducedMotion = useReducedMotion();
@@ -145,10 +686,54 @@ export function GenjutsuBackdrop() {
   const isGenjutsuActive = isTsukuyomiMode || isTimerRunning;
   const factor = prefersReducedMotion ? 0 : 1;
 
+  const [crowPairs, setCrowPairs] = useState<CrowEyePair[]>([]);
+  const [waterRippleNonce, setWaterRippleNonce] = useState(0);
+  const [foregroundFeatherNonce, setForegroundFeatherNonce] = useState(0);
+
   const genjutsuActiveRef = useRef(isGenjutsuActive);
   useEffect(() => {
     genjutsuActiveRef.current = isGenjutsuActive;
   }, [isGenjutsuActive]);
+
+  const chakraRgbRef = useRef<CanvasChakraRgb>(
+    CHAKRA_RGB_MAP[mangekyouVariant] ?? CHAKRA_RGB_MAP.itachi,
+  );
+  useEffect(() => {
+    chakraRgbRef.current =
+      CHAKRA_RGB_MAP[mangekyouVariant] ?? CHAKRA_RGB_MAP.itachi;
+  }, [mangekyouVariant]);
+
+  const tsukuyomiCastNonceRef = useRef(tsukuyomiCastNonce);
+  useEffect(() => {
+    tsukuyomiCastNonceRef.current = tsukuyomiCastNonce;
+  }, [tsukuyomiCastNonce]);
+
+  const crowPairsRef = useRef<CrowEyePair[]>([]);
+  useEffect(() => {
+    crowPairsRef.current = crowPairs;
+  }, [crowPairs]);
+
+  const prevMinuteRef = useRef<number | null>(null);
+  useEffect(() => {
+    const prevMinute = prevMinuteRef.current;
+    prevMinuteRef.current = currentMinuteBucket;
+
+    if (
+      prefersReducedMotion ||
+      !isTimerRunning ||
+      prevMinute === null ||
+      currentMinuteBucket === prevMinute
+    ) {
+      return;
+    }
+
+    const rafId = window.requestAnimationFrame(() => {
+      setWaterRippleNonce((n) => n + 1);
+    });
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [currentMinuteBucket, isTimerRunning, prefersReducedMotion]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -162,13 +747,37 @@ export function GenjutsuBackdrop() {
   const skyX = useTransform(smoothX, [-0.5, 0.5], [10 * factor, -10 * factor]);
   const skyY = useTransform(smoothY, [-0.5, 0.5], [10 * factor, -10 * factor]);
 
-  // Layer -2 (Abyss Vignette & 2.5D Architectural Horizon): mid depth
+  // Heavy cinematic parallax for Tsukuyomi Blood Moon descent impact
+  const moonDescentX = useTransform(
+    smoothX,
+    [-0.5, 0.5],
+    [34 * factor, -34 * factor],
+  );
+  const moonDescentY = useTransform(
+    smoothY,
+    [-0.5, 0.5],
+    [28 * factor, -28 * factor],
+  );
+
+  // Layer -2 (Abyss Vignette & 2.5D Architectural Horizon): mid & deep parallax planes
   const abyssX = useTransform(smoothX, [-0.5, 0.5], [16 * factor, -16 * factor]);
   const abyssY = useTransform(smoothY, [-0.5, 0.5], [16 * factor, -16 * factor]);
+
+  const monolithX = useTransform(
+    smoothX,
+    [-0.5, 0.5],
+    [18 * factor, -18 * factor],
+  );
+  const monolithY = useTransform(
+    smoothY,
+    [-0.5, 0.5],
+    [14 * factor, -14 * factor],
+  );
 
   const horizonX = useTransform(smoothX, [-0.5, 0.5], [24 * factor, -24 * factor]);
   const horizonY = useTransform(smoothY, [-0.5, 0.5], [18 * factor, -18 * factor]);
 
+  // Global pointer tracking for 2.5D parallax & edge crow-eye proximity dissolve
   useEffect(() => {
     if (prefersReducedMotion) {
       rawX.set(0);
@@ -183,6 +792,33 @@ export function GenjutsuBackdrop() {
       const normY = Math.max(-0.5, Math.min(0.5, e.clientY / height - 0.5));
       rawX.set(normX);
       rawY.set(normY);
+
+      const pairs = crowPairsRef.current;
+      if (pairs.length === 0) return;
+
+      let triggered = false;
+      const now = Date.now();
+      const updated = pairs.map((pair) => {
+        if (pair.status !== 'watching') return pair;
+        const pairX = (pair.xPct / 100) * width;
+        const pairY = (pair.yPct / 100) * height;
+        const dx = e.clientX - pairX;
+        const dy = e.clientY - pairY;
+        if (dx * dx + dy * dy <= CROW_EYE_TRIGGER_RADIUS_SQ) {
+          triggered = true;
+          return {
+            ...pair,
+            status: 'dissolving' as const,
+            dissolvedAt: now,
+          };
+        }
+        return pair;
+      });
+
+      if (triggered) {
+        crowPairsRef.current = updated;
+        setCrowPairs(updated);
+      }
     };
 
     const handlePointerLeave = () => {
@@ -199,7 +835,60 @@ export function GenjutsuBackdrop() {
     };
   }, [prefersReducedMotion, rawX, rawY]);
 
-  // Layer -1: 60fps Crow Feathers & Rising Crimson Embers Canvas
+  // Ambient darkness blinking crow eyes lifecycle (outer screen edges)
+  useEffect(() => {
+    if (prefersReducedMotion || typeof window === 'undefined') {
+      return;
+    }
+
+    const initialTimer = window.setTimeout(() => {
+      const first = createCrowEyePair();
+      const occupied = new Set([first.zoneIndex]);
+      const second = createCrowEyePair(occupied);
+      setCrowPairs([first, second]);
+    }, 900);
+
+    const cycleInterval = window.setInterval(() => {
+      const now = Date.now();
+      setCrowPairs((prev) => {
+        const active = prev.filter((pair) => {
+          if (pair.status === 'dissolving') {
+            return now - pair.dissolvedAt < 1150;
+          }
+          return now - pair.spawnedAt < 9000;
+        });
+
+        const watchingCount = active.filter((p) => p.status === 'watching').length;
+        if (watchingCount < 3) {
+          const occupied = new Set(active.map((p) => p.zoneIndex));
+          return [...active, createCrowEyePair(occupied)];
+        }
+        return active.length === prev.length ? prev : active;
+      });
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(cycleInterval);
+    };
+  }, [prefersReducedMotion]);
+
+  // Depth-of-Field foreground giant feather sweeping across camera lens every 12s
+  useEffect(() => {
+    if (prefersReducedMotion || typeof window === 'undefined') {
+      return;
+    }
+
+    const sweepInterval = window.setInterval(() => {
+      setForegroundFeatherNonce((n) => n + 1);
+    }, 12000);
+
+    return () => {
+      window.clearInterval(sweepInterval);
+    };
+  }, [prefersReducedMotion]);
+
+  // Layer -1: 60fps Wind-Physics Crow Feathers, Chakra Embers & Animated Crows Canvas
   useEffect(() => {
     if (prefersReducedMotion || typeof window === 'undefined') {
       return;
@@ -233,97 +922,54 @@ export function GenjutsuBackdrop() {
     const embers: EmberParticle[] = Array.from({ length: maxEmbers }, () =>
       createEmber(width, height, true),
     );
+    const crows: CrowParticle[] = [];
 
+    let lastSeenCastNonce = 0;
     let rafId = 0;
     let lastTime = performance.now();
 
     const tick = (now: number) => {
       const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
       lastTime = now;
+      const tSec = now * 0.001;
+
+      const currentCastNonce = tsukuyomiCastNonceRef.current;
+      if (currentCastNonce > lastSeenCastNonce) {
+        lastSeenCastNonce = currentCastNonce;
+        if (currentCastNonce > 0) {
+          spawnCrowBurst(crows, width, height);
+        }
+      }
 
       const active = genjutsuActiveRef.current;
       const activeFeatherLimit = active ? maxFeathers : 7;
       const activeEmberLimit = active ? maxEmbers : 10;
+      const rgb = chakraRgbRef.current;
 
       ctx.clearRect(0, 0, width, height);
 
-      // Draw rising crimson chakra embers
-      for (let i = 0; i < activeEmberLimit; i++) {
-        const ember = embers[i];
-        ember.driftPhase += ember.driftSpeed * dt;
-        ember.y += ember.vy * (active ? 1.15 : 0.75) * dt;
-        ember.x += Math.sin(ember.driftPhase) * 14 * dt;
-
-        if (ember.y < -16) {
-          embers[i] = createEmber(width, height, false);
-          continue;
-        }
-
-        const heightRatio = Math.max(0, Math.min(1, ember.y / Math.max(1, height)));
-        const fade = Math.sin(heightRatio * Math.PI);
-        const alpha = ember.alpha * fade * (active ? 0.9 : 0.36);
-
-        if (alpha <= 0.02) continue;
-
-        ctx.beginPath();
-        ctx.arc(ember.x, ember.y, ember.size, 0, Math.PI * 2);
-        ctx.fillStyle = ember.crimsonBright
-          ? `rgba(239, 68, 68, ${alpha.toFixed(3)})`
-          : `rgba(220, 38, 38, ${alpha.toFixed(3)})`;
-        ctx.fill();
-      }
-
-      // Draw slow-motion tumbling black crow feathers (2.5D sinusoidal tumble)
-      for (let i = 0; i < activeFeatherLimit; i++) {
-        const f = feathers[i];
-        f.tumblePhase += f.tumbleSpeed * dt;
-        f.rot += f.vRot * dt;
-        f.y += f.vy * (active ? 1.0 : 0.7) * dt;
-        f.x += (f.vx + Math.sin(f.tumblePhase * 0.8) * f.swayAmp) * dt;
-
-        if (f.y > height + 36) {
-          feathers[i] = createFeather(width, height, false);
-          continue;
-        }
-        if (f.x < -40) f.x = width + 30;
-        if (f.x > width + 40) f.x = -30;
-
-        const tumbleScale = Math.cos(f.tumblePhase);
-        const absTumble = Math.max(0.18, Math.abs(tumbleScale));
-        const alpha = f.alpha * (active ? 1 : 0.42);
-
-        ctx.save();
-        ctx.translate(f.x, f.y);
-        ctx.rotate(f.rot);
-        ctx.scale(tumbleScale < 0 ? -absTumble : absTumble, 1);
-
-        // Feather vane silhouette
-        ctx.beginPath();
-        ctx.moveTo(0, -f.length * 0.55);
-        ctx.quadraticCurveTo(f.width, -f.length * 0.1, f.width * 0.65, f.length * 0.45);
-        ctx.lineTo(0, f.length * 0.6);
-        ctx.quadraticCurveTo(-f.width * 0.9, f.length * 0.12, 0, -f.length * 0.55);
-        ctx.closePath();
-
-        ctx.fillStyle = `rgba(6, 6, 9, ${alpha.toFixed(3)})`;
-        ctx.fill();
-
-        ctx.lineWidth = 0.8;
-        ctx.strokeStyle = active
-          ? `rgba(185, 28, 28, ${(alpha * 0.58).toFixed(3)})`
-          : `rgba(82, 82, 91, ${(alpha * 0.35).toFixed(3)})`;
-        ctx.stroke();
-
-        // Central rachis quill line
-        ctx.beginPath();
-        ctx.moveTo(0, -f.length * 0.52);
-        ctx.lineTo(0, f.length * 0.68);
-        ctx.lineWidth = 0.7;
-        ctx.strokeStyle = `rgba(127, 29, 29, ${(alpha * 0.45).toFixed(3)})`;
-        ctx.stroke();
-
-        ctx.restore();
-      }
+      updateAndDrawEmbers(
+        ctx,
+        embers,
+        activeEmberLimit,
+        dt,
+        width,
+        height,
+        active,
+        rgb,
+      );
+      updateAndDrawFeathers(
+        ctx,
+        feathers,
+        activeFeatherLimit,
+        dt,
+        tSec,
+        width,
+        height,
+        active,
+        rgb,
+      );
+      updateAndDrawCrows(ctx, crows, dt, width, height, rgb);
 
       rafId = window.requestAnimationFrame(tick);
     };
@@ -337,6 +983,11 @@ export function GenjutsuBackdrop() {
     };
   }, [prefersReducedMotion]);
 
+  const activeForegroundTrajectory =
+    FOREGROUND_FEATHER_TRAJECTORIES[
+      foregroundFeatherNonce % FOREGROUND_FEATHER_TRAJECTORIES.length
+    ];
+
   return (
     <>
       <div
@@ -346,7 +997,7 @@ export function GenjutsuBackdrop() {
           isTsukuyomiMode ? 'bg-[#000000]' : 'bg-[#09090B]',
         )}
       >
-        {/* Layer -3: Genjutsu Crimson Sky, Giant Blood Moon & Drifting Volumetric Clouds */}
+        {/* Layer -3: Genjutsu Crimson Sky, Giant Blood Moon (/assets/vfx/blood-moon.webp) & Drifting Volumetric Clouds */}
         <motion.div
           style={{ x: skyX, y: skyY, ...WILL_CHANGE_TRANSFORM }}
           className={cn(
@@ -354,58 +1005,59 @@ export function GenjutsuBackdrop() {
             isGenjutsuActive ? 'opacity-100' : 'opacity-0',
           )}
         >
-          {/* Dark crimson Tsukuyomi atmospheric sky */}
+          {/* Dark reactive Tsukuyomi atmospheric sky */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 transition-all duration-700"
             style={{
               background:
-                'radial-gradient(ellipse 85% 58% at 72% 20%, rgba(127, 29, 29, 0.36) 0%, rgba(69, 10, 10, 0.16) 44%, rgba(0, 0, 0, 0) 78%), linear-gradient(180deg, rgba(42, 6, 9, 0.55) 0%, rgba(12, 3, 5, 0.25) 52%, rgba(0, 0, 0, 0) 100%)',
+                'radial-gradient(ellipse 85% 58% at 72% 20%, rgba(var(--chakra-rgb, 220, 38, 38), 0.24) 0%, rgba(var(--chakra-rgb, 220, 38, 38), 0.1) 44%, rgba(0, 0, 0, 0) 78%), linear-gradient(180deg, rgba(16, 6, 12, 0.55) 0%, rgba(6, 4, 8, 0.25) 52%, rgba(0, 0, 0, 0) 100%)',
             }}
           />
 
-          {/* Giant Blood Moon with subtle Mangekyou / Rinnegan projection */}
-          <div className="absolute right-[6%] top-[6%] h-[210px] w-[210px] sm:right-[11%] sm:top-[6%] sm:h-[320px] sm:w-[320px] lg:h-[390px] lg:w-[390px]">
+          {/* Giant Blood Moon (real VFX artwork fused with chakra lunar corona & subtle Rinnegan projection) */}
+          <motion.div
+            key={`sky-blood-moon-${tsukuyomiCastNonce}`}
+            initial={
+              tsukuyomiCastNonce > 0 && !prefersReducedMotion
+                ? { y: -150, scale: 1.24, opacity: 0.15 }
+                : { y: 0, scale: 1, opacity: 1 }
+            }
+            animate={{ y: 0, scale: 1, opacity: 1 }}
+            transition={
+              tsukuyomiCastNonce > 0 && !prefersReducedMotion
+                ? { duration: 1.25, type: 'tween', ease: [0.16, 1, 0.3, 1] }
+                : { duration: 0 }
+            }
+            style={WILL_CHANGE_TRANSFORM_OPACITY}
+            className="absolute right-[4%] top-[4%] h-[230px] w-[230px] sm:right-[9%] sm:top-[4%] sm:h-[340px] sm:w-[340px] lg:h-[420px] lg:w-[420px]"
+          >
+            {/* Atmospheric reactive lunar corona */}
+            <div
+              className="absolute -inset-10 rounded-full transition-all duration-700"
+              style={{
+                background:
+                  'radial-gradient(circle at center, rgba(var(--chakra-rgb, 220, 38, 38), 0.32) 0%, rgba(var(--chakra-rgb, 220, 38, 38), 0.12) 52%, rgba(0, 0, 0, 0) 74%)',
+              }}
+            />
+
+            <Image
+              src="/assets/vfx/blood-moon.webp"
+              alt=""
+              fill
+              unoptimized
+              loading="eager"
+              sizes="(min-width: 1024px) 420px, (min-width: 640px) 340px, 230px"
+              className={cn('object-contain opacity-95', VFX_BLEND_MASK_CLASS)}
+            />
+
+            {/* Subtle Projected Rinnegan / Mangekyou Silhouette */}
             <svg
               viewBox="0 0 320 320"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              className="h-full w-full"
+              className="relative z-10 h-full w-full opacity-[0.18]"
             >
-              <defs>
-                <radialGradient id={moonCoronaId} cx="50%" cy="50%" r="50%">
-                  <stop offset="52%" stopColor="rgba(220, 38, 38, 0.32)" />
-                  <stop offset="76%" stopColor="rgba(127, 29, 29, 0.14)" />
-                  <stop offset="100%" stopColor="rgba(0, 0, 0, 0)" />
-                </radialGradient>
-                <radialGradient id={moonDiscId} cx="44%" cy="42%" r="56%">
-                  <stop offset="0%" stopColor="#DC2626" stopOpacity="0.9" />
-                  <stop offset="48%" stopColor="#991B1B" stopOpacity="0.88" />
-                  <stop offset="84%" stopColor="#450A0A" stopOpacity="0.92" />
-                  <stop offset="100%" stopColor="#180406" stopOpacity="0.95" />
-                </radialGradient>
-              </defs>
-
-              <circle cx="160" cy="160" r="158" fill={`url(#${moonCoronaId})`} />
-              <circle
-                cx="160"
-                cy="160"
-                r="102"
-                fill={`url(#${moonDiscId})`}
-                stroke="#EF4444"
-                strokeOpacity="0.28"
-                strokeWidth="1.2"
-              />
-
-              {/* Subtle Lunar Shadow Craters */}
-              <g fill="#2A0507" fillOpacity="0.38">
-                <circle cx="128" cy="126" r="19" />
-                <circle cx="192" cy="140" r="13" />
-                <circle cx="152" cy="198" r="22" />
-                <ellipse cx="184" cy="190" rx="14" ry="9" />
-              </g>
-
-              {/* Subtle Projected Rinnegan / Mangekyou Silhouette */}
-              <g opacity="0.24" stroke="#09090B">
+              <g stroke="#09090B">
                 <circle cx="160" cy="160" r="80" strokeWidth="1.4" />
                 <circle cx="160" cy="160" r="56" strokeWidth="1.4" />
                 <circle cx="160" cy="160" r="32" strokeWidth="1.4" />
@@ -421,7 +1073,7 @@ export function GenjutsuBackdrop() {
                 <circle cx="160" cy="160" r="10" fill="#09090B" stroke="none" />
               </g>
             </svg>
-          </div>
+          </motion.div>
 
           {/* Drifting Volumetric Clouds */}
           <motion.div
@@ -524,7 +1176,8 @@ export function GenjutsuBackdrop() {
                 cx="380"
                 cy="380"
                 r="340"
-                stroke="#7F1D1D"
+                stroke="var(--chakra-primary, #7F1D1D)"
+                strokeOpacity="0.45"
                 strokeWidth="1"
                 strokeDasharray="6 10"
               />
@@ -532,7 +1185,7 @@ export function GenjutsuBackdrop() {
                 cx="380"
                 cy="380"
                 r="268"
-                stroke="#DC2626"
+                stroke="var(--chakra-primary, #DC2626)"
                 strokeOpacity="0.45"
                 strokeWidth="1"
               />
@@ -540,20 +1193,21 @@ export function GenjutsuBackdrop() {
                 cx="380"
                 cy="380"
                 r="196"
-                stroke="#7F1D1D"
+                stroke="var(--chakra-primary, #7F1D1D)"
+                strokeOpacity="0.45"
                 strokeWidth="1"
                 strokeDasharray="2 8"
               />
               <polygon
                 points="380,68 650,536 110,536"
-                stroke="#7F1D1D"
-                strokeOpacity="0.45"
+                stroke="var(--chakra-primary, #7F1D1D)"
+                strokeOpacity="0.4"
                 strokeWidth="1"
               />
               <polygon
                 points="380,692 110,224 650,224"
-                stroke="#7F1D1D"
-                strokeOpacity="0.35"
+                stroke="var(--chakra-primary, #7F1D1D)"
+                strokeOpacity="0.32"
                 strokeWidth="1"
               />
               <line
@@ -578,12 +1232,33 @@ export function GenjutsuBackdrop() {
           </div>
         </motion.div>
 
-        {/* Layer -2: 2.5D Architectural Horizon (Tilted Tsukuyomi Monoliths/Crosses, Broken Torii Gates, Konoha Utility Poles/Cables) */}
+        {/* Layer -2B: Real 2.5D Monoliths Horizon Artwork (/assets/vfx/monoliths-horizon.webp) */}
+        <motion.div
+          style={{ x: monolithX, y: monolithY, ...WILL_CHANGE_TRANSFORM }}
+          className={cn(
+            'absolute -inset-8 transition-opacity duration-1000',
+            isGenjutsuActive ? 'opacity-75' : 'opacity-30',
+          )}
+        >
+          <div className="relative h-full w-full">
+            <Image
+              src="/assets/vfx/monoliths-horizon.webp"
+              alt=""
+              fill
+              unoptimized
+              loading="eager"
+              sizes="100vw"
+              className={cn('object-cover object-bottom', VFX_BLEND_MASK_CLASS)}
+            />
+          </div>
+        </motion.div>
+
+        {/* Layer -2A: 2.5D Architectural Horizon Silhouette (Tilted Tsukuyomi Monoliths/Crosses, Broken Torii Gates, Konoha Utility Poles/Cables) */}
         <motion.div
           style={{ x: horizonX, y: horizonY, ...WILL_CHANGE_TRANSFORM }}
           className={cn(
             'absolute -inset-8 transition-opacity duration-700',
-            isGenjutsuActive ? 'opacity-95' : 'opacity-45',
+            isGenjutsuActive ? 'opacity-90' : 'opacity-40',
           )}
         >
           <svg
@@ -602,8 +1277,8 @@ export function GenjutsuBackdrop() {
             {/* Left Flank: Tilted Tsukuyomi Crosses & Monoliths */}
             <g
               fill="#050508"
-              stroke={isGenjutsuActive ? '#7F1D1D' : '#27272A'}
-              strokeOpacity={isGenjutsuActive ? '0.65' : '0.45'}
+              stroke={isGenjutsuActive ? 'var(--chakra-primary, #7F1D1D)' : '#27272A'}
+              strokeOpacity={isGenjutsuActive ? '0.45' : '0.45'}
               strokeWidth="1.2"
             >
               {/* Tall tilted Tsukuyomi cross (Left Outer) */}
@@ -628,8 +1303,8 @@ export function GenjutsuBackdrop() {
             {/* Right Flank: Tilted Tsukuyomi Monoliths & Broken Torii */}
             <g
               fill="#050508"
-              stroke={isGenjutsuActive ? '#7F1D1D' : '#27272A'}
-              strokeOpacity={isGenjutsuActive ? '0.65' : '0.45'}
+              stroke={isGenjutsuActive ? 'var(--chakra-primary, #7F1D1D)' : '#27272A'}
+              strokeOpacity={isGenjutsuActive ? '0.45' : '0.45'}
               strokeWidth="1.2"
             >
               {/* Tall tilted Tsukuyomi cross (Right Outer) */}
@@ -650,10 +1325,7 @@ export function GenjutsuBackdrop() {
             </g>
 
             {/* Konoha Utility Poles & Sagging Catenary Cables */}
-            <g
-              stroke="#07070A"
-              fill="#050508"
-            >
+            <g stroke="#07070A" fill="#050508">
               {/* Left Konoha Pole */}
               <rect x="74" y="210" width="9" height="585" />
               <rect x="44" y="248" width="68" height="5" />
@@ -667,51 +1339,63 @@ export function GenjutsuBackdrop() {
               <path
                 d="M -20 218 Q 34 252 78 248 Q 220 355 430 330"
                 fill="none"
-                stroke={isGenjutsuActive ? '#450A0A' : '#18181B'}
+                stroke={isGenjutsuActive ? 'var(--chakra-primary, #450A0A)' : '#18181B'}
                 strokeWidth="1.4"
-                strokeOpacity="0.7"
+                strokeOpacity={isGenjutsuActive ? '0.42' : '0.7'}
               />
               <path
                 d="M -20 264 Q 30 296 78 290 Q 210 390 390 368"
                 fill="none"
-                stroke={isGenjutsuActive ? '#450A0A' : '#18181B'}
+                stroke={isGenjutsuActive ? 'var(--chakra-primary, #450A0A)' : '#18181B'}
                 strokeWidth="1.1"
-                strokeOpacity="0.55"
+                strokeOpacity={isGenjutsuActive ? '0.35' : '0.55'}
               />
               <path
                 d="M 1010 318 Q 1210 352 1360 232 Q 1408 240 1460 210"
                 fill="none"
-                stroke={isGenjutsuActive ? '#450A0A' : '#18181B'}
+                stroke={isGenjutsuActive ? 'var(--chakra-primary, #450A0A)' : '#18181B'}
                 strokeWidth="1.4"
-                strokeOpacity="0.7"
+                strokeOpacity={isGenjutsuActive ? '0.42' : '0.7'}
               />
               <path
                 d="M 1050 358 Q 1230 388 1360 274 Q 1410 282 1460 256"
                 fill="none"
-                stroke={isGenjutsuActive ? '#450A0A' : '#18181B'}
+                stroke={isGenjutsuActive ? 'var(--chakra-primary, #450A0A)' : '#18181B'}
                 strokeWidth="1.1"
-                strokeOpacity="0.55"
+                strokeOpacity={isGenjutsuActive ? '0.35' : '0.55'}
               />
             </g>
           </svg>
         </motion.div>
 
-        {/* Layer -2: Subtle Rippling Floor Reflection at Bottom */}
+        {/* Layer -1.5: Deep Center-Darkening Vignette + Reactive Peripheral Chakra Bleed */}
         <div
           className={cn(
-            'absolute inset-x-0 bottom-0 h-[16vh] transition-opacity duration-700',
-            isGenjutsuActive ? 'opacity-90' : 'opacity-40',
+            'pointer-events-none absolute inset-0 transition-all duration-700',
+            isGenjutsuActive ? 'opacity-100' : 'opacity-90',
           )}
           style={{
             background:
-              'linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(12, 2, 4, 0.72) 42%, rgba(0, 0, 0, 0.96) 100%)',
+              'radial-gradient(circle at 50% 48%, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.78) 48%, rgba(4, 4, 7, 0.65) 70%, rgba(var(--chakra-rgb, 220, 38, 38), 0.22) 100%)',
+          }}
+        />
+
+        {/* Layer -2: Bottom Dark Water Reflection (h-[16vh]) + Concentric Minute-Tick Ripples */}
+        <div
+          className={cn(
+            'absolute inset-x-0 bottom-0 h-[16vh] overflow-hidden transition-opacity duration-700',
+            isGenjutsuActive ? 'opacity-90' : 'opacity-50',
+          )}
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(8, 4, 10, 0.72) 42%, rgba(0, 0, 0, 0.96) 100%)',
           }}
         >
           <div
-            className="mx-auto mt-3 h-px w-[82%] opacity-40"
+            className="mx-auto mt-3 h-px w-[82%] opacity-40 transition-all duration-700"
             style={{
               background: isGenjutsuActive
-                ? 'linear-gradient(90deg, transparent 0%, rgba(220,38,38,0.55) 50%, transparent 100%)'
+                ? 'linear-gradient(90deg, transparent 0%, rgba(var(--chakra-rgb, 220, 38, 38), 0.55) 50%, transparent 100%)'
                 : 'linear-gradient(90deg, transparent 0%, rgba(82,82,91,0.35) 50%, transparent 100%)',
             }}
           />
@@ -730,17 +1414,86 @@ export function GenjutsuBackdrop() {
             className="mx-auto mt-4 h-3 w-[48%] rounded-full blur-md"
           >
             <div
-              className="h-full w-full rounded-full"
+              className="h-full w-full rounded-full transition-all duration-700"
               style={{
                 background: isGenjutsuActive
-                  ? 'radial-gradient(ellipse at center, rgba(220, 38, 38, 0.42) 0%, rgba(0,0,0,0) 75%)'
-                  : 'radial-gradient(ellipse at center, rgba(127, 29, 29, 0.18) 0%, rgba(0,0,0,0) 75%)',
+                  ? 'radial-gradient(ellipse at center, rgba(var(--chakra-rgb, 220, 38, 38), 0.42) 0%, rgba(0,0,0,0) 75%)'
+                  : 'radial-gradient(ellipse at center, rgba(var(--chakra-rgb, 220, 38, 38), 0.16) 0%, rgba(0,0,0,0) 75%)',
               }}
             />
           </motion.div>
+
+          {/* Concentric Water Ripples triggered on every clock minute pass (or Tsukuyomi activation) */}
+          {!prefersReducedMotion && (waterRippleNonce > 0 || tsukuyomiCastNonce > 0) && (
+            <div
+              key={`water-ripple-${waterRippleNonce}-${tsukuyomiCastNonce}`}
+              className="pointer-events-none absolute inset-0 flex items-center justify-center pt-3"
+            >
+              {[0, 1, 2].map((ringIndex) => (
+                <div
+                  key={ringIndex}
+                  className="absolute flex items-center justify-center"
+                  style={{ transform: 'scaleY(0.26)' }}
+                >
+                  <motion.div
+                    initial={{ scale: 0.18, opacity: 0.8 }}
+                    animate={{
+                      scale: [0.18, 1.2, 2.35],
+                      opacity: [0.8, 0.42, 0],
+                      transitionEnd: { display: 'none' },
+                    }}
+                    transition={{
+                      duration: 1.85,
+                      delay: ringIndex * 0.22,
+                      times: [0, 0.38, 1],
+                      type: 'tween',
+                      ease: [0.16, 1, 0.3, 1],
+                    }}
+                    style={{
+                      ...WILL_CHANGE_TRANSFORM_OPACITY,
+                      borderColor: 'var(--chakra-primary, #DC2626)',
+                      boxShadow: isGenjutsuActive
+                        ? '0 0 16px var(--chakra-glow, rgba(220,38,38,0.4))'
+                        : '0 0 10px var(--chakra-glow, rgba(127,29,29,0.3))',
+                    }}
+                    className="h-36 w-36 rounded-full border opacity-75 sm:h-48 sm:w-48"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Layer -1: 60fps Crow Feathers & Rising Crimson Embers Canvas */}
+        {/* Layer -1.2 & -1.1: 2 Continuous Horizontal Volumetric Moving Fog Layers at Base */}
+        <motion.div
+          animate={prefersReducedMotion ? { x: '0%' } : { x: ['0%', '-50%'] }}
+          transition={
+            prefersReducedMotion
+              ? { duration: 0 }
+              : { duration: 28, repeat: Infinity, type: 'tween', ease: 'linear' }
+          }
+          style={WILL_CHANGE_TRANSFORM}
+          className="pointer-events-none absolute bottom-0 left-0 flex h-[28vh] w-[200%]"
+        >
+          <MistTile intense={isGenjutsuActive} variant="back" />
+          <MistTile intense={isGenjutsuActive} variant="back" />
+        </motion.div>
+
+        <motion.div
+          animate={prefersReducedMotion ? { x: '0%' } : { x: ['-50%', '0%'] }}
+          transition={
+            prefersReducedMotion
+              ? { duration: 0 }
+              : { duration: 20, repeat: Infinity, type: 'tween', ease: 'linear' }
+          }
+          style={WILL_CHANGE_TRANSFORM}
+          className="pointer-events-none absolute bottom-0 left-0 flex h-[18vh] w-[200%]"
+        >
+          <MistTile intense={isGenjutsuActive} variant="front" />
+          <MistTile intense={isGenjutsuActive} variant="front" />
+        </motion.div>
+
+        {/* Layer -1: 60fps Wind-Physics Feathers, Chakra Embers & Animated Crows Canvas */}
         {!prefersReducedMotion && (
           <canvas
             ref={canvasRef}
@@ -748,9 +1501,192 @@ export function GenjutsuBackdrop() {
             className="pointer-events-none absolute inset-0 h-full w-full"
           />
         )}
+
+        {/* Layer -1: Ambient Darkness Blinking Crow Eyes (outer perimeter -> cursor dissolve into feathers) */}
+        {!prefersReducedMotion &&
+          crowPairs.map((pair) => (
+            <div
+              key={pair.id}
+              style={{
+                left: `${pair.xPct}%`,
+                top: `${pair.yPct}%`,
+                transform: `translate(-50%, -50%) rotate(${pair.tiltDeg}deg)`,
+              }}
+              className="pointer-events-none absolute"
+            >
+              {pair.status === 'watching' ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0.92, 0.88, 0] }}
+                  transition={{
+                    duration: 8.6,
+                    times: [0, 0.08, 0.85, 1],
+                    type: 'tween',
+                    ease: 'easeInOut',
+                  }}
+                  style={WILL_CHANGE_TRANSFORM_OPACITY}
+                  className="relative flex items-center justify-center"
+                >
+                  <div className="absolute -inset-2 rounded-full bg-black/45 blur-[2px]" />
+                  <motion.div
+                    animate={{ scaleY: [1, 0.08, 1, 0.08, 1] }}
+                    transition={{
+                      duration: 0.7,
+                      times: [0, 0.18, 0.36, 0.58, 1],
+                      repeat: Infinity,
+                      repeatDelay: 2.3,
+                      type: 'tween',
+                      ease: 'easeInOut',
+                    }}
+                    style={{ ...WILL_CHANGE_TRANSFORM, transformOrigin: 'center' }}
+                    className="relative flex items-center gap-[7px]"
+                  >
+                    <span
+                      className="h-[4px] w-[6px] rounded-full transition-colors duration-700"
+                      style={{
+                        backgroundColor: 'var(--chakra-primary, #EF4444)',
+                        boxShadow:
+                          '0 0 8px var(--chakra-primary, #DC2626), 0 0 14px var(--chakra-glow, rgba(239,68,68,0.65))',
+                      }}
+                    />
+                    <span
+                      className="h-[4px] w-[6px] rounded-full transition-colors duration-700"
+                      style={{
+                        backgroundColor: 'var(--chakra-primary, #EF4444)',
+                        boxShadow:
+                          '0 0 8px var(--chakra-primary, #DC2626), 0 0 14px var(--chakra-glow, rgba(239,68,68,0.65))',
+                      }}
+                    />
+                  </motion.div>
+                </motion.div>
+              ) : (
+                <div className="relative flex items-center justify-center">
+                  {/* Rapid eye vanish flash */}
+                  <motion.div
+                    initial={{ opacity: 0.85, scale: 1 }}
+                    animate={{ opacity: 0, scale: 0.35 }}
+                    transition={{ duration: 0.16, type: 'tween', ease: 'easeOut' }}
+                    style={WILL_CHANGE_TRANSFORM_OPACITY}
+                    className="absolute flex items-center gap-[7px]"
+                  >
+                    <span
+                      className="h-[4px] w-[6px] rounded-full"
+                      style={{ backgroundColor: 'var(--chakra-primary, #DC2626)' }}
+                    />
+                    <span
+                      className="h-[4px] w-[6px] rounded-full"
+                      style={{ backgroundColor: 'var(--chakra-primary, #DC2626)' }}
+                    />
+                  </motion.div>
+
+                  {/* 2-3 Black crow feathers fluttering away */}
+                  {pair.feathers.map((feather) => (
+                    <motion.div
+                      key={feather.id}
+                      initial={{
+                        x: 0,
+                        y: 0,
+                        opacity: 0.95,
+                        rotate: feather.startRotate,
+                        scale: 0.65 * feather.lengthScale,
+                      }}
+                      animate={{
+                        x: [0, feather.midX, feather.endX],
+                        y: [0, feather.midY, feather.endY],
+                        opacity: [0.95, 0.85, 0],
+                        rotate: [
+                          feather.startRotate,
+                          feather.midRotate,
+                          feather.endRotate,
+                        ],
+                        scale: [
+                          0.65 * feather.lengthScale,
+                          1.05 * feather.lengthScale,
+                          0.82 * feather.lengthScale,
+                        ],
+                      }}
+                      transition={{
+                        duration: 0.95,
+                        times: [0, 0.45, 1],
+                        type: 'tween',
+                        ease: 'easeOut',
+                      }}
+                      style={WILL_CHANGE_TRANSFORM_OPACITY}
+                      className="absolute"
+                    >
+                      <DissolveFeatherSvg />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
       </div>
 
-      {/* 1.1s Tsukuyomi Activation Cutscene (triggered when tsukuyomiCastNonce > 0 changes) */}
+      {/* Depth-of-Field Foreground Giant Feather cutting across the camera lens every 12s */}
+      {!prefersReducedMotion && foregroundFeatherNonce > 0 ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
+        >
+          <motion.div
+            key={`dof-feather-${foregroundFeatherNonce}`}
+            initial={{
+              display: 'block',
+              x: activeForegroundTrajectory.startX,
+              y: activeForegroundTrajectory.startY,
+              rotate: activeForegroundTrajectory.startRot,
+              scale: 2.2,
+            }}
+            animate={{
+              x: [
+                activeForegroundTrajectory.startX,
+                activeForegroundTrajectory.midX,
+                activeForegroundTrajectory.endX,
+              ],
+              y: [
+                activeForegroundTrajectory.startY,
+                activeForegroundTrajectory.midY,
+                activeForegroundTrajectory.endY,
+              ],
+              rotate: [
+                activeForegroundTrajectory.startRot,
+                activeForegroundTrajectory.midRot,
+                activeForegroundTrajectory.endRot,
+              ],
+              scale: 2.2,
+              transitionEnd: { display: 'none' },
+            }}
+            transition={{
+              duration: 1.05,
+              times: [0, 0.5, 1],
+              type: 'tween',
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            style={{
+              filter: 'blur(5px)',
+              ...WILL_CHANGE_TRANSFORM,
+            }}
+            className="absolute left-0 top-0"
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.72, 0.68, 0] }}
+              transition={{
+                duration: 1.05,
+                times: [0, 0.16, 0.82, 1],
+                type: 'tween',
+                ease: 'linear',
+              }}
+              style={WILL_CHANGE_TRANSFORM_OPACITY}
+            >
+              <ForegroundGiantFeatherSvg />
+            </motion.div>
+          </motion.div>
+        </div>
+      ) : null}
+
+      {/* Tsukuyomi Activation Cutscene (triggered when tsukuyomiCastNonce > 0 changes) */}
       {tsukuyomiCastNonce > 0 ? (
         <motion.div
           key={`tsukuyomi-cast-${tsukuyomiCastNonce}`}
@@ -761,52 +1697,95 @@ export function GenjutsuBackdrop() {
             transitionEnd: { display: 'none' },
           }}
           transition={{
-            duration: prefersReducedMotion ? 0.3 : 1.1,
+            duration: prefersReducedMotion ? 0.3 : 1.15,
             times: [0, 0.86, 1],
             type: 'tween',
             ease: 'linear',
           }}
           className="pointer-events-none fixed inset-0 z-[95] overflow-hidden"
         >
-          {/* Brief Invert / Contrast Anime Distortion */}
+          {/* Crisp 90ms Photographic Negative High-Contrast Impact Frame (filter: invert(1) contrast(3)) */}
           <motion.div
-            initial={{ opacity: 0, filter: 'invert(0) contrast(1)' }}
+            initial={
+              prefersReducedMotion
+                ? { opacity: 0 }
+                : { opacity: 1, filter: 'invert(1) contrast(3)' }
+            }
             animate={
               prefersReducedMotion
                 ? {
-                    opacity: [0, 0.5, 0],
-                    filter: [
-                      'invert(0) contrast(1)',
-                      'invert(1) contrast(1.2)',
-                      'invert(0) contrast(1)',
-                    ],
+                    opacity: [0, 0.35, 0],
+                    transitionEnd: { display: 'none' },
                   }
                 : {
-                    opacity: [0, 0.95, 0.72, 0],
+                    opacity: [1, 1, 0],
                     filter: [
-                      'invert(0) contrast(1)',
-                      'invert(1) contrast(1.45)',
-                      'invert(1) contrast(1.3)',
+                      'invert(1) contrast(3)',
+                      'invert(1) contrast(3)',
                       'invert(0) contrast(1)',
                     ],
+                    transitionEnd: { display: 'none' },
                   }
             }
             transition={{
-              duration: prefersReducedMotion ? 0.28 : 0.45,
-              times: prefersReducedMotion ? [0, 0.5, 1] : [0, 0.2, 0.55, 1],
+              duration: prefersReducedMotion ? 0.25 : 0.09,
+              times: [0, 0.78, 1],
               type: 'tween',
-              ease: 'easeInOut',
+              ease: 'linear',
             }}
-            style={{
-              backdropFilter: 'invert(1) contrast(1.4)',
-              WebkitBackdropFilter: 'invert(1) contrast(1.4)',
-              willChange: 'opacity, filter',
-            }}
-            className="absolute inset-0 bg-red-950/20"
+            style={
+              prefersReducedMotion
+                ? WILL_CHANGE_TRANSFORM_OPACITY
+                : {
+                    backdropFilter: 'invert(1) contrast(3)',
+                    WebkitBackdropFilter: 'invert(1) contrast(3)',
+                    willChange: 'opacity, filter',
+                  }
+            }
+            className={cn(
+              'absolute inset-0 z-30',
+              prefersReducedMotion ? 'bg-red-950/30' : 'bg-white/[0.04]',
+            )}
           />
 
-          {/* Expanding Radial Crimson Shockwave Rings from Center */}
-          <div className="absolute inset-0 flex items-center justify-center">
+          {/* Descending Giant Blood Moon (/assets/vfx/blood-moon.webp) with Heavy Cinematic Parallax */}
+          {!prefersReducedMotion && (
+            <motion.div
+              style={{ x: moonDescentX, y: moonDescentY, ...WILL_CHANGE_TRANSFORM }}
+              className="absolute inset-0 z-10 flex items-center justify-center"
+            >
+              <motion.div
+                initial={{ y: '-48vh', scale: 1.38, opacity: 0 }}
+                animate={{
+                  y: ['-48vh', '-4vh', '4vh'],
+                  scale: [1.38, 1.06, 0.94],
+                  opacity: [0, 0.96, 0],
+                }}
+                transition={{
+                  duration: 1.05,
+                  delay: 0.05,
+                  times: [0, 0.42, 1],
+                  type: 'tween',
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+                style={WILL_CHANGE_TRANSFORM_OPACITY}
+                className="relative h-[320px] w-[320px] sm:h-[460px] sm:w-[460px]"
+              >
+                <Image
+                  src="/assets/vfx/blood-moon.webp"
+                  alt=""
+                  fill
+                  unoptimized
+                  loading="eager"
+                  sizes="(min-width: 640px) 460px, 320px"
+                  className={cn('object-contain', VFX_BLEND_MASK_CLASS)}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* Expanding Radial Chakra Shockwave Rings from Center */}
+          <div className="absolute inset-0 z-20 flex items-center justify-center">
             <motion.div
               initial={{ scale: 0.1, opacity: 0.95 }}
               animate={{
@@ -821,10 +1800,11 @@ export function GenjutsuBackdrop() {
               }}
               style={{
                 ...WILL_CHANGE_TRANSFORM_OPACITY,
+                borderColor: 'var(--chakra-primary, #DC2626)',
                 boxShadow:
-                  '0 0 60px rgba(220, 38, 38, 0.85), inset 0 0 40px rgba(220, 38, 38, 0.45)',
+                  '0 0 60px var(--chakra-glow, rgba(220, 38, 38, 0.85)), inset 0 0 40px var(--chakra-glow, rgba(220, 38, 38, 0.45))',
               }}
-              className="h-64 w-64 rounded-full border-2 border-red-500/90"
+              className="h-64 w-64 rounded-full border-2"
             />
             {!prefersReducedMotion && (
               <motion.div
@@ -840,47 +1820,14 @@ export function GenjutsuBackdrop() {
                   type: 'tween',
                   ease: [0.16, 1, 0.3, 1],
                 }}
-                style={WILL_CHANGE_TRANSFORM_OPACITY}
-                className="absolute h-52 w-52 rounded-full border border-red-400/80"
+                style={{
+                  ...WILL_CHANGE_TRANSFORM_OPACITY,
+                  borderColor: 'var(--chakra-primary, #DC2626)',
+                }}
+                className="absolute h-52 w-52 rounded-full border opacity-80"
               />
             )}
           </div>
-
-          {/* Dispersing Flock of Crow Silhouettes Flying Toward Camera */}
-          {!prefersReducedMotion && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              {CROW_FLOCK_VECTORS.map((crow) => (
-                <motion.div
-                  key={crow.id}
-                  initial={{
-                    x: 0,
-                    y: 0,
-                    scale: 0.3,
-                    opacity: 0,
-                    rotate: crow.startRotate,
-                  }}
-                  animate={{
-                    x: [0, crow.midX, crow.targetX],
-                    y: [0, crow.midY, crow.targetY],
-                    scale: [0.3, 1.35, 2.5],
-                    opacity: [0, 1, 0],
-                    rotate: [crow.startRotate, (crow.startRotate + crow.endRotate) / 2, crow.endRotate],
-                  }}
-                  transition={{
-                    duration: 0.95,
-                    delay: crow.delay,
-                    times: [0, 0.42, 1],
-                    type: 'tween',
-                    ease: [0.16, 1, 0.3, 1],
-                  }}
-                  style={WILL_CHANGE_TRANSFORM_OPACITY}
-                  className="absolute"
-                >
-                  <CrowSilhouetteSvg />
-                </motion.div>
-              ))}
-            </div>
-          )}
         </motion.div>
       ) : null}
 

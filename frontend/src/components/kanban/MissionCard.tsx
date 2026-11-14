@@ -7,10 +7,12 @@ import {
   type MouseEvent,
   type PointerEvent,
 } from 'react';
+import Image from 'next/image';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
   motion,
+  useAnimate,
   useMotionTemplate,
   useMotionValue,
   useReducedMotion,
@@ -56,18 +58,120 @@ const BUTTON_SPRING = {
 
 const AMATERASU_EMBERS: ReadonlyArray<{
   id: string;
-  left: string;
+  positionClass: string;
+  left?: string;
+  top?: string;
   dx: number;
+  dy: [number, number, number];
   delay: number;
   duration: number;
   size: number;
+  hoverOnly?: boolean;
 }> = [
-  { id: 'ember-1', left: '12%', dx: -4, delay: 0, duration: 2.1, size: 4 },
-  { id: 'ember-2', left: '28%', dx: 5, delay: 0.45, duration: 2.4, size: 5 },
-  { id: 'ember-3', left: '46%', dx: -3, delay: 0.9, duration: 1.9, size: 4 },
-  { id: 'ember-4', left: '63%', dx: 4, delay: 0.25, duration: 2.3, size: 5 },
-  { id: 'ember-5', left: '78%', dx: -5, delay: 0.75, duration: 2.0, size: 4 },
-  { id: 'ember-6', left: '90%', dx: 3, delay: 1.2, duration: 2.2, size: 3 },
+  {
+    id: 'ember-top-1',
+    positionClass: '-top-1',
+    left: '12%',
+    dx: -4,
+    dy: [4, -14, -28],
+    delay: 0,
+    duration: 2.1,
+    size: 4,
+  },
+  {
+    id: 'ember-top-2',
+    positionClass: '-top-1',
+    left: '28%',
+    dx: 5,
+    dy: [4, -15, -30],
+    delay: 0.45,
+    duration: 2.4,
+    size: 5,
+  },
+  {
+    id: 'ember-top-3',
+    positionClass: '-top-1',
+    left: '46%',
+    dx: -3,
+    dy: [4, -13, -26],
+    delay: 0.9,
+    duration: 1.9,
+    size: 4,
+  },
+  {
+    id: 'ember-top-4',
+    positionClass: '-top-1',
+    left: '63%',
+    dx: 4,
+    dy: [4, -16, -32],
+    delay: 0.25,
+    duration: 2.3,
+    size: 5,
+  },
+  {
+    id: 'ember-top-5',
+    positionClass: '-top-1',
+    left: '78%',
+    dx: -5,
+    dy: [4, -14, -28],
+    delay: 0.75,
+    duration: 2.0,
+    size: 4,
+  },
+  {
+    id: 'ember-top-6',
+    positionClass: '-top-1',
+    left: '90%',
+    dx: 3,
+    dy: [4, -12, -24],
+    delay: 1.2,
+    duration: 2.2,
+    size: 3,
+  },
+  {
+    id: 'ember-left-1',
+    positionClass: 'left-1.5',
+    top: '38%',
+    dx: 6,
+    dy: [0, -18, -36],
+    delay: 0.15,
+    duration: 1.75,
+    size: 4,
+    hoverOnly: true,
+  },
+  {
+    id: 'ember-left-2',
+    positionClass: 'left-3',
+    top: '68%',
+    dx: 8,
+    dy: [0, -20, -40],
+    delay: 0.55,
+    duration: 1.9,
+    size: 5,
+    hoverOnly: true,
+  },
+  {
+    id: 'ember-right-1',
+    positionClass: 'right-1.5',
+    top: '34%',
+    dx: -6,
+    dy: [0, -18, -36],
+    delay: 0.3,
+    duration: 1.8,
+    size: 4,
+    hoverOnly: true,
+  },
+  {
+    id: 'ember-right-2',
+    positionClass: 'right-3',
+    top: '70%',
+    dx: -8,
+    dy: [0, -22, -42],
+    delay: 0.7,
+    duration: 2.0,
+    size: 5,
+    hoverOnly: true,
+  },
 ];
 
 function AmaterasuFlameEmblem({
@@ -127,8 +231,10 @@ function AmaterasuFlameEmblem({
 
 function AmaterasuLivingFlames({
   prefersReducedMotion,
+  isHovered,
 }: {
   prefersReducedMotion: boolean;
+  isHovered: boolean;
 }) {
   return (
     <div
@@ -304,33 +410,36 @@ function AmaterasuLivingFlames({
         </svg>
       </motion.div>
 
-      {/* Rising Black & Crimson Embers (never orange/yellow) */}
+      {/* Rising Black Embers Rimmed in #DC2626 (never orange/yellow) */}
       {!prefersReducedMotion &&
-        AMATERASU_EMBERS.map((ember) => (
-          <motion.span
-            key={ember.id}
-            style={{
-              left: ember.left,
-              width: ember.size,
-              height: ember.size,
-              boxShadow: '0 0 7px rgba(220, 38, 38, 0.9)',
-            }}
-            animate={{
-              y: [4, -14, -28],
-              x: [0, ember.dx, -ember.dx],
-              opacity: [0, 0.95, 0],
-              scale: [0.7, 1.1, 0.25],
-            }}
-            transition={{
-              type: 'tween',
-              duration: ember.duration,
-              delay: ember.delay,
-              ease: 'easeOut',
-              repeat: Infinity,
-            }}
-            className="absolute -top-1 rounded-full border border-[#DC2626] bg-[#000000] will-change-transform"
-          />
-        ))}
+        AMATERASU_EMBERS.filter((ember) => !ember.hoverOnly || isHovered).map(
+          (ember) => (
+            <motion.span
+              key={ember.id}
+              style={{
+                left: ember.left,
+                top: ember.top,
+                width: ember.size,
+                height: ember.size,
+                boxShadow: '0 0 8px rgba(220, 38, 38, 0.95)',
+              }}
+              animate={{
+                y: ember.dy,
+                x: [0, ember.dx, -ember.dx],
+                opacity: [0, 0.95, 0],
+                scale: [0.7, 1.15, 0.2],
+              }}
+              transition={{
+                type: 'tween',
+                duration: isHovered ? ember.duration * 0.78 : ember.duration,
+                delay: ember.delay,
+                ease: 'easeOut',
+                repeat: Infinity,
+              }}
+              className="absolute rounded-full border border-[#DC2626] bg-[#000000] will-change-transform"
+            />
+          ),
+        )}
     </div>
   );
 }
@@ -351,8 +460,11 @@ function MissionCardSurface({
   onDelete,
 }: MissionCardSurfaceProps) {
   const prefersReducedMotion = Boolean(useReducedMotion());
+  const [cardScope, animateCard] = useAnimate<HTMLDivElement>();
   const [isVortexing, setIsVortexing] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const vortexTimerRef = useRef<number | null>(null);
+  const hasSlammedCompletedRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -361,6 +473,48 @@ function MissionCardSurface({
       }
     };
   }, []);
+
+  // Trigger Hanko (完) slam & 120ms card shake cleanly on mount in `completed` or transition into `completed`
+  useEffect(() => {
+    if (isOverlay) return;
+
+    if (mission.status !== 'completed') {
+      hasSlammedCompletedRef.current = false;
+      return;
+    }
+
+    if (isDragging) return;
+
+    if (!hasSlammedCompletedRef.current) {
+      hasSlammedCompletedRef.current = true;
+      if (prefersReducedMotion || !cardScope.current) return;
+
+      void animateCard(
+        cardScope.current,
+        { x: [0, -3, 3, -2, 0] },
+        { type: 'tween', duration: 0.12, ease: 'easeOut' },
+      );
+
+      void animateCard(
+        '[data-hanko-stamp]',
+        { scale: [3, 1], opacity: [0, 1] },
+        { type: 'tween', duration: 0.2, ease: [0.16, 1, 0.3, 1] },
+      );
+
+      void animateCard(
+        '[data-hanko-impact]',
+        { scale: [0.65, 1.85], opacity: [0.9, 0] },
+        { type: 'tween', duration: 0.36, ease: 'easeOut' },
+      );
+    }
+  }, [
+    mission.status,
+    isDragging,
+    isOverlay,
+    prefersReducedMotion,
+    cardScope,
+    animateCard,
+  ]);
 
   // Disable 3D pointer tilt while dragging, inside DragOverlay, or during spiral vortex
   const disableTilt = isDragging || isOverlay || isVortexing;
@@ -414,19 +568,44 @@ function MissionCardSurface({
 
   const specularGlareBg = useMotionTemplate`radial-gradient(280px circle at ${glareXPercent}% ${glareYPercent}%, ${
     mission.isAmaterasu
-      ? 'rgba(220, 38, 38, 0.22)'
+      ? 'rgba(220, 38, 38, 0.24)'
       : 'rgba(255, 255, 255, 0.12)'
   } 0%, ${
     mission.isAmaterasu
-      ? 'rgba(127, 29, 29, 0.08)'
+      ? 'rgba(127, 29, 29, 0.1)'
       : 'rgba(220, 38, 38, 0.06)'
   } 40%, transparent 72%), linear-gradient(${diagonalAngle}deg, transparent 28%, rgba(255, 255, 255, 0.05) 50%, transparent 72%)`;
 
   function handlePointerEnter() {
     if (disableTilt) return;
     audioEngine.playHover();
+    setIsHovered(true);
+
     if (!prefersReducedMotion) {
       glareOpacityTarget.set(1);
+
+      if (cardScope.current) {
+        void animateCard(
+          '[data-katana-carrier]',
+          { x: ['-18%', '118%'], opacity: [0, 1, 1, 0] },
+          {
+            type: 'tween',
+            duration: 0.18,
+            times: [0, 0.15, 0.85, 1],
+            ease: [0.16, 1, 0.3, 1],
+          },
+        );
+        void animateCard(
+          '[data-katana-top]',
+          { x: [0, 1.5, 0] },
+          { type: 'tween', duration: 0.18, ease: 'easeOut' },
+        );
+        void animateCard(
+          '[data-katana-bottom]',
+          { x: [0, -1.5, 0] },
+          { type: 'tween', duration: 0.18, ease: 'easeOut' },
+        );
+      }
     }
   }
 
@@ -448,6 +627,7 @@ function MissionCardSurface({
   }
 
   function handlePointerLeave() {
+    setIsHovered(false);
     rawX.set(0);
     rawY.set(0);
     glareOpacityTarget.set(0);
@@ -457,7 +637,8 @@ function MissionCardSurface({
     e.stopPropagation();
     if (!onDragToTsukuyomi || isVortexing) return;
 
-    void audioEngine.play('sharingan-activate');
+    audioEngine.playClick();
+    setIsHovered(false);
 
     if (prefersReducedMotion) {
       onDragToTsukuyomi(mission.id);
@@ -485,335 +666,537 @@ function MissionCardSurface({
     usedSusanoo: false,
   });
 
+  const activeHover = isHovered && !disableTilt;
+
   return (
     <div style={{ perspective: '1200px' }} className="relative">
-      {/* 2.5D Kamui/Tsukuyomi Spiral Suction Ring on click */}
-      {isVortexing && !prefersReducedMotion && (
-        <motion.div
-          aria-hidden="true"
-          initial={{ opacity: 0, scale: 0.35, rotate: 0 }}
-          animate={{
-            opacity: [0, 0.95, 0],
-            scale: [0.35, 1.25, 0.1],
-            rotate: [0, 180, 360],
-          }}
-          transition={{
-            type: 'tween',
-            duration: 0.45,
-            ease: 'easeInOut',
-          }}
-          className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center will-change-transform"
-        >
-          <div className="h-36 w-36 rounded-full border-2 border-dashed border-[#DC2626] bg-[radial-gradient(circle,rgba(0,0,0,0.95)_0%,rgba(127,29,29,0.45)_55%,transparent_75%)] shadow-[0_0_32px_rgba(220,38,38,0.75)]" />
-        </motion.div>
-      )}
-
-      <motion.div
-        onPointerEnter={handlePointerEnter}
-        onPointerMove={handlePointerMove}
-        onPointerLeave={handlePointerLeave}
-        animate={
-          isVortexing && !prefersReducedMotion
-            ? {
-                scale: [1, 1.06, 0.05],
-                rotate: [0, -10, 240],
-                opacity: [1, 1, 0],
-                filter: ['blur(0px)', 'blur(0px)', 'blur(10px)'],
-              }
-            : {
-                scale: 1,
-                rotate: 0,
-                opacity: 1,
-                filter: 'blur(0px)',
-              }
-        }
-        transition={
-          isVortexing && !prefersReducedMotion
-            ? {
-                type: 'tween',
-                duration: 0.45,
-                times: [0, 0.25, 1],
-                ease: [0.32, 0, 0.67, 0],
-              }
-            : { duration: 0.15 }
-        }
-        style={{
-          rotateX: disableTilt ? 0 : rotateX,
-          rotateY: disableTilt ? 0 : rotateY,
-          transformStyle: 'preserve-3d',
-        }}
-        className={cn(
-          'group relative rounded-xl border p-4 transition-colors duration-200 will-change-transform',
-          mission.isAmaterasu
-            ? 'animate-amaterasu-flicker border-[#DC2626]/75 bg-[#000000] shadow-[inset_0_0_26px_rgba(0,0,0,0.98),0_14px_34px_rgba(0,0,0,0.94)]'
-            : 'border-[#27272A] border-t-white/[0.08] bg-[#121215]/95 shadow-[0_14px_34px_rgba(0,0,0,0.85)] hover:border-[#3F3F46]',
-          isActiveInTemple &&
-            !mission.isAmaterasu &&
-            'border-[#DC2626]/55 border-t-[#EF4444]/30',
-          isOverlay &&
-            'ring-1 ring-[#DC2626]/65 shadow-[0_24px_56px_rgba(0,0,0,0.95)]',
+      <div ref={cardScope} className="relative will-change-transform">
+        {/* 2.5D Kamui/Tsukuyomi Spiral Suction Ring on click */}
+        {isVortexing && !prefersReducedMotion && (
+          <motion.div
+            aria-hidden="true"
+            initial={{ opacity: 0, scale: 0.35, rotate: 0 }}
+            animate={{
+              opacity: [0, 0.95, 0],
+              scale: [0.35, 1.25, 0.1],
+              rotate: [0, 180, 360],
+            }}
+            transition={{
+              type: 'tween',
+              duration: 0.45,
+              ease: 'easeInOut',
+            }}
+            className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center will-change-transform"
+          >
+            <div className="h-36 w-36 rounded-full border-2 border-dashed border-[#DC2626] bg-[radial-gradient(circle,rgba(0,0,0,0.95)_0%,rgba(127,29,29,0.45)_55%,transparent_75%)] shadow-[0_0_32px_rgba(220,38,38,0.75)]" />
+          </motion.div>
         )}
-      >
-        {/* Clipped Inner Backdrop & Specular Spotlight Glare */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl"
-        >
-          {mission.isAmaterasu && (
-            <>
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#DC2626] to-transparent opacity-95" />
-              <motion.div
-                style={
-                  disableTilt ? undefined : { x: bgShiftX, y: bgShiftY }
-                }
-                className="absolute -inset-2 bg-[radial-gradient(circle_at_85%_15%,rgba(127,29,29,0.3)_0%,rgba(0,0,0,0.96)_62%,#000000_100%)] will-change-transform"
-              />
-            </>
-          )}
 
-          {/* Dynamic 2.5D Specular Pointer Glare (disabled during drag/overlay) */}
-          {!disableTilt && !prefersReducedMotion && (
-            <motion.div
-              style={{
-                background: specularGlareBg,
-                opacity: smoothGlareOpacity,
-              }}
-              className="absolute inset-0 will-change-transform"
+        <motion.div
+          onPointerEnter={handlePointerEnter}
+          onPointerMove={handlePointerMove}
+          onPointerLeave={handlePointerLeave}
+          animate={
+            isVortexing && !prefersReducedMotion
+              ? {
+                  rotate: 360,
+                  scale: 0,
+                  borderRadius: '50%',
+                  filter: 'blur(8px)',
+                  opacity: 0,
+                }
+              : {
+                  rotate: 0,
+                  scale: 1,
+                  borderRadius: '12px',
+                  filter: 'blur(0px)',
+                  opacity: 1,
+                }
+          }
+          transition={
+            isVortexing && !prefersReducedMotion
+              ? {
+                  type: 'tween',
+                  duration: 0.44,
+                  ease: [0.42, 0, 0.85, 0.15],
+                }
+              : { duration: 0.15 }
+          }
+          style={{
+            rotateX: disableTilt ? 0 : rotateX,
+            rotateY: disableTilt ? 0 : rotateY,
+            transformStyle: 'preserve-3d',
+          }}
+          className={cn(
+            'group relative rounded-xl border p-4 transition-colors duration-200 will-change-transform',
+            isVortexing && 'overflow-hidden',
+            mission.isAmaterasu
+              ? 'animate-amaterasu-flicker border-[#DC2626]/75 bg-gradient-to-b from-[#080203]/95 via-[#020001]/98 to-[#000000] shadow-[inset_0_1px_0_0_rgba(220,38,38,0.22),inset_0_0_26px_rgba(0,0,0,0.98),0_25px_50px_-12px_rgba(0,0,0,0.98)] hover:border-[#EF4444]'
+              : 'border-white/[0.06] bg-gradient-to-b from-[#141418]/90 via-[#0C0C0F]/95 to-[#070709]/98 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] hover:border-red-500/30',
+            isActiveInTemple &&
+              !mission.isAmaterasu &&
+              'border-[#DC2626]/55 border-t-[#EF4444]/30',
+            isOverlay &&
+              'ring-1 ring-[#DC2626]/65 shadow-[0_24px_56px_rgba(0,0,0,0.95)]',
+          )}
+        >
+          {/* Clipped Inner Backdrop, Amaterasu Burn Reveal, Specular Glare & Katana Slash */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl"
+          >
+            {/* Subtle Tactical Scroll Top Rim Specular */}
+            <div
+              className={cn(
+                'absolute inset-x-4 top-0 h-px',
+                mission.isAmaterasu
+                  ? 'bg-gradient-to-r from-transparent via-[#DC2626] to-transparent opacity-95'
+                  : isActiveInTemple
+                    ? 'bg-gradient-to-r from-transparent via-[#EF4444]/75 to-transparent'
+                    : 'bg-gradient-to-r from-transparent via-white/20 to-transparent',
+              )}
+            />
+
+            {/* Amaterasu Burn Reveal with /assets/vfx/amaterasu-black-flames.webp */}
+            {mission.isAmaterasu && (
+              <>
+                <motion.div
+                  style={
+                    disableTilt ? undefined : { x: bgShiftX, y: bgShiftY }
+                  }
+                  className="absolute -inset-2 bg-[radial-gradient(circle_at_85%_15%,rgba(127,29,29,0.28)_0%,rgba(0,0,0,0.96)_62%,#000000_100%)] will-change-transform"
+                />
+
+                {/* Edge-anchored Amaterasu black flames texture */}
+                <motion.div
+                  animate={{ opacity: activeHover ? 0.88 : 0.45 }}
+                  transition={{ type: 'tween', duration: 0.28, ease: 'easeOut' }}
+                  className="absolute inset-0"
+                >
+                  <Image
+                    src="/assets/vfx/amaterasu-black-flames.webp"
+                    alt=""
+                    fill
+                    unoptimized
+                    sizes="(max-width: 768px) 100vw, 400px"
+                    className="object-cover mix-blend-screen [mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_98%)]"
+                  />
+                </motion.div>
+
+                {/* Left burning-paper edge creep inward on hover */}
+                <motion.div
+                  animate={{
+                    width: activeHover ? 112 : 44,
+                    opacity: activeHover ? 0.96 : 0.62,
+                    x: activeHover ? 0 : -8,
+                  }}
+                  transition={{ type: 'tween', duration: 0.32, ease: 'easeOut' }}
+                  className="absolute inset-y-0 left-0 overflow-hidden will-change-transform"
+                >
+                  <div className="relative h-full w-32">
+                    <Image
+                      src="/assets/vfx/amaterasu-black-flames.webp"
+                      alt=""
+                      fill
+                      unoptimized
+                      sizes="160px"
+                      className="object-cover object-left mix-blend-screen [mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_98%)]"
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#000000]/92 via-[#000000]/55 to-transparent" />
+                  <div className="absolute inset-y-2 right-0 w-px bg-gradient-to-b from-transparent via-[#DC2626]/80 to-transparent" />
+                </motion.div>
+
+                {/* Right burning-paper edge creep inward on hover */}
+                <motion.div
+                  animate={{
+                    width: activeHover ? 112 : 44,
+                    opacity: activeHover ? 0.96 : 0.62,
+                    x: activeHover ? 0 : 8,
+                  }}
+                  transition={{ type: 'tween', duration: 0.32, ease: 'easeOut' }}
+                  className="absolute inset-y-0 right-0 overflow-hidden will-change-transform"
+                >
+                  <div className="relative ml-auto h-full w-32">
+                    <Image
+                      src="/assets/vfx/amaterasu-black-flames.webp"
+                      alt=""
+                      fill
+                      unoptimized
+                      sizes="160px"
+                      className="object-cover object-right mix-blend-screen [mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_98%)]"
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-l from-[#000000]/92 via-[#000000]/55 to-transparent" />
+                  <div className="absolute inset-y-2 left-0 w-px bg-gradient-to-b from-transparent via-[#DC2626]/80 to-transparent" />
+                </motion.div>
+
+                {/* Central abyssal scrim so mission title stays sharp */}
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.74)_28%,rgba(0,0,0,0.28)_76%,transparent_100%)]" />
+              </>
+            )}
+
+            {/* Dynamic 2.5D Specular Pointer Glare (disabled during drag/overlay) */}
+            {!disableTilt && !prefersReducedMotion && (
+              <motion.div
+                style={{
+                  background: specularGlareBg,
+                  opacity: smoothGlareOpacity,
+                }}
+                className="absolute inset-0 will-change-transform"
+              />
+            )}
+
+            {/* Katana Slash Sheen (2px diagonal beam rotated 35deg, white core + red halo) */}
+            <div
+              data-katana-carrier=""
+              style={{ opacity: 0, transform: 'translateX(-18%)' }}
+              className="pointer-events-none absolute inset-0 z-20 will-change-transform"
+            >
+              <div
+                className="absolute -top-[45%] left-0 h-[190%] w-[2px] rotate-[35deg] bg-white"
+                style={{
+                  boxShadow:
+                    '0 0 8px 1px #FFFFFF, 0 0 16px 3px rgba(239, 68, 68, 0.95), 0 0 28px 6px rgba(220, 38, 38, 0.65)',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Living Black Flames Crown & Lateral Wisps on Amaterasu Missions */}
+          {mission.isAmaterasu && (
+            <AmaterasuLivingFlames
+              prefersReducedMotion={prefersReducedMotion}
+              isHovered={activeHover}
             />
           )}
-        </div>
 
-        {/* Living Black Flames on Amaterasu Missions */}
-        {mission.isAmaterasu && (
-          <AmaterasuLivingFlames prefersReducedMotion={prefersReducedMotion} />
-        )}
+          {/* Incandescent Completion Stamp (完 Hanko Slam) */}
+          {isCompleted && (!isDragging || isOverlay) && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute top-11 right-3 z-20 flex items-center justify-center"
+            >
+              {/* Smoldering red ember glow mark */}
+              <motion.div
+                animate={
+                  prefersReducedMotion
+                    ? { opacity: 0.7 }
+                    : {
+                        opacity: [0.45, 0.85, 0.45],
+                        scale: [0.96, 1.06, 0.96],
+                      }
+                }
+                transition={
+                  prefersReducedMotion
+                    ? { duration: 0 }
+                    : {
+                        type: 'tween',
+                        duration: 2.6,
+                        ease: 'easeInOut',
+                        repeat: Infinity,
+                      }
+                }
+                className="absolute h-16 w-16 rounded-full bg-[radial-gradient(circle,rgba(220,38,38,0.42)_0%,rgba(127,29,29,0.2)_50%,transparent_76%)] will-change-transform"
+              />
 
-        {/* Card Content */}
-        <div
-          className="relative z-10 space-y-3"
-          style={
-            disableTilt || prefersReducedMotion
-              ? undefined
-              : { transformStyle: 'preserve-3d' }
-          }
-        >
-          {/* Top Row: Rank Badge (translateZ elevated) + Amaterasu + Controls */}
+              {/* Brief incandescent ring shockwave on stamp slam */}
+              <div
+                data-hanko-impact=""
+                style={{ opacity: 0 }}
+                className="absolute h-11 w-11 rounded-[6px] border border-[#EF4444] shadow-[0_0_16px_rgba(239,68,68,0.9)] will-change-transform"
+              />
+
+              {/* Traditional Japanese Red Hanko Stamp: 完 */}
+              <div
+                data-hanko-stamp=""
+                className="relative flex items-center justify-center will-change-transform"
+              >
+                <div className="flex h-10 w-10 -rotate-12 items-center justify-center rounded-[5px] border-2 border-[#EF4444]/90 bg-[#450A0A]/60 p-0.5 shadow-[0_0_16px_rgba(220,38,38,0.68),inset_0_0_10px_rgba(220,38,38,0.48)]">
+                  <div className="flex h-full w-full items-center justify-center rounded-[2px] border border-[#DC2626]/55">
+                    <span className="font-serif text-lg leading-none font-extrabold text-[#EF4444] select-none drop-shadow-[0_0_6px_rgba(239,68,68,0.85)]">
+                      完
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Card Content (Top Half + Hairline Divider + Bottom Half for Katana Micro-Split) */}
           <div
-            className="flex items-center justify-between gap-2"
+            className="relative z-10 space-y-2.5"
             style={
               disableTilt || prefersReducedMotion
                 ? undefined
                 : { transformStyle: 'preserve-3d' }
             }
           >
+            {/* TOP HALF: Tactical Rank Header + Title & Description */}
             <div
-              className="flex flex-wrap items-center gap-1.5"
+              data-katana-top=""
+              className="space-y-2.5 will-change-transform"
               style={
                 disableTilt || prefersReducedMotion
                   ? undefined
                   : { transformStyle: 'preserve-3d' }
               }
             >
-              <motion.span
-                style={{
-                  color: rankDef.badgeColor,
-                  borderColor: rankDef.borderColor,
-                  backgroundColor: 'rgba(9, 9, 11, 0.94)',
-                  boxShadow: `0 0 14px ${rankDef.glowColor}`,
-                  ...(disableTilt || prefersReducedMotion
-                    ? {}
-                    : {
-                        x: fgShiftX,
-                        y: fgShiftY,
-                        transform: 'translateZ(26px)',
-                      }),
-                }}
-                className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] font-bold tracking-wide tabular-nums will-change-transform"
+              {/* Top Row: LED + Glowing Rank Badge + Amaterasu + Controls */}
+              <div
+                className="flex items-center justify-between gap-2"
+                style={
+                  disableTilt || prefersReducedMotion
+                    ? undefined
+                    : { transformStyle: 'preserve-3d' }
+                }
               >
-                <span>{rankDef.rank}</span>
-                <span className="text-[10px] font-normal opacity-80">
-                  {rankDef.multiplier.toFixed(1)}x
-                </span>
-              </motion.span>
-
-              {mission.isAmaterasu && (
-                <motion.button
-                  type="button"
-                  onPointerDown={stopCardEvent}
-                  onMouseEnter={() => audioEngine.playHover()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void audioEngine.play('amaterasu-ignite');
-                  }}
-                  title="Selo Amaterasu ativo (2.0x Chakra)"
-                  aria-label="Ativar ressonância das chamas negras do Amaterasu"
+                <div
+                  className="flex flex-wrap items-center gap-1.5"
                   style={
                     disableTilt || prefersReducedMotion
                       ? undefined
-                      : {
-                          x: fgShiftX,
-                          y: fgShiftY,
-                          transform: 'translateZ(22px)',
-                        }
+                      : { transformStyle: 'preserve-3d' }
                   }
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#DC2626]/75 bg-[#000000] px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-[#EF4444] uppercase transition-colors hover:border-[#EF4444] will-change-transform"
                 >
-                  <AmaterasuFlameEmblem
-                    prefersReducedMotion={prefersReducedMotion}
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'h-1.5 w-1.5 shrink-0 rounded-full',
+                      mission.isAmaterasu
+                        ? 'bg-[#DC2626] shadow-[0_0_8px_#dc2626]'
+                        : isActiveInTemple
+                          ? 'bg-red-500 shadow-[0_0_8px_#ef4444]'
+                          : isCompleted
+                            ? 'bg-[#DC2626]/80 shadow-[0_0_6px_rgba(220,38,38,0.6)]'
+                            : 'bg-zinc-400/75 shadow-[0_0_6px_rgba(161,161,170,0.4)]',
+                    )}
                   />
-                  <span>Amaterasu 2.0x</span>
-                </motion.button>
-              )}
 
-              {isActiveInTemple && (
-                <span className="inline-flex items-center gap-1 rounded-md border border-[#7F1D1D]/70 bg-[#450A0A]/40 px-2 py-0.5 font-mono text-[10px] font-medium text-[#FCA5A5]">
-                  <Eye className="h-3 w-3 text-[#EF4444]" />
-                  No Altar
-                </span>
-              )}
-            </div>
+                  <motion.span
+                    style={{
+                      color: rankDef.badgeColor,
+                      borderColor: rankDef.borderColor,
+                      backgroundColor: 'rgba(9, 9, 12, 0.95)',
+                      boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 16px ${rankDef.glowColor}`,
+                      ...(disableTilt || prefersReducedMotion
+                        ? {}
+                        : {
+                            x: fgShiftX,
+                            y: fgShiftY,
+                            transform: 'translateZ(26px)',
+                          }),
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] font-bold tracking-wide tabular-nums will-change-transform"
+                  >
+                    <span>{rankDef.rank}</span>
+                    <span className="text-[10px] font-normal opacity-80">
+                      {rankDef.multiplier.toFixed(1)}x
+                    </span>
+                  </motion.span>
 
-            <div className="flex items-center gap-1">
-              {!isCompleted && onToggleAmaterasu && (
-                <motion.button
-                  type="button"
-                  whileHover={
-                    prefersReducedMotion ? undefined : { scale: 1.1 }
-                  }
-                  whileTap={prefersReducedMotion ? undefined : { scale: 0.92 }}
-                  transition={BUTTON_SPRING}
-                  onPointerDown={stopCardEvent}
-                  onMouseEnter={() => audioEngine.playHover()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleAmaterasu(mission.id);
-                  }}
-                  disabled={isVortexing}
-                  title={
-                    mission.isAmaterasu
-                      ? 'Apagar chamas do Amaterasu'
-                      : 'Selar com Amaterasu (2.0x Chakra hoje)'
-                  }
-                  aria-label={
-                    mission.isAmaterasu
-                      ? `Apagar Amaterasu da missão ${mission.title}`
-                      : `Marcar missão ${mission.title} com Amaterasu`
-                  }
+                  {mission.isAmaterasu && (
+                    <motion.button
+                      type="button"
+                      onPointerDown={stopCardEvent}
+                      onMouseEnter={() => audioEngine.playHover()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void audioEngine.play('amaterasu-ignite');
+                      }}
+                      title="Selo Amaterasu ativo (2.0x Chakra)"
+                      aria-label="Ativar ressonância das chamas negras do Amaterasu"
+                      style={
+                        disableTilt || prefersReducedMotion
+                          ? undefined
+                          : {
+                              x: fgShiftX,
+                              y: fgShiftY,
+                              transform: 'translateZ(22px)',
+                            }
+                      }
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#DC2626]/75 bg-[#000000] px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-[#EF4444] uppercase transition-colors hover:border-[#EF4444] will-change-transform"
+                    >
+                      <AmaterasuFlameEmblem
+                        prefersReducedMotion={prefersReducedMotion}
+                      />
+                      <span>Amaterasu 2.0x</span>
+                    </motion.button>
+                  )}
+
+                  {isActiveInTemple && (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-[#7F1D1D]/70 bg-[#450A0A]/45 px-2 py-0.5 font-mono text-[10px] font-medium text-[#FCA5A5]">
+                      <Eye className="h-3 w-3 text-[#EF4444]" />
+                      No Altar
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  {!isCompleted && onToggleAmaterasu && (
+                    <motion.button
+                      type="button"
+                      whileHover={
+                        prefersReducedMotion ? undefined : { scale: 1.1 }
+                      }
+                      whileTap={
+                        prefersReducedMotion ? undefined : { scale: 0.92 }
+                      }
+                      transition={BUTTON_SPRING}
+                      onPointerDown={stopCardEvent}
+                      onMouseEnter={() => audioEngine.playHover()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleAmaterasu(mission.id);
+                      }}
+                      disabled={isVortexing}
+                      title={
+                        mission.isAmaterasu
+                          ? 'Apagar chamas do Amaterasu'
+                          : 'Selar com Amaterasu (2.0x Chakra hoje)'
+                      }
+                      aria-label={
+                        mission.isAmaterasu
+                          ? `Apagar Amaterasu da missão ${mission.title}`
+                          : `Marcar missão ${mission.title} com Amaterasu`
+                      }
+                      className={cn(
+                        'rounded-md border p-1.5 transition-colors',
+                        mission.isAmaterasu
+                          ? 'border-[#DC2626]/80 bg-[#000000] text-[#EF4444] hover:bg-[#450A0A]/60'
+                          : 'border-transparent bg-transparent text-[#52525B] hover:border-[#7F1D1D]/60 hover:bg-[#09090B] hover:text-[#DC2626]',
+                      )}
+                    >
+                      <Flame className="h-3.5 w-3.5" />
+                    </motion.button>
+                  )}
+
+                  {onDelete && (
+                    <motion.button
+                      type="button"
+                      whileHover={
+                        prefersReducedMotion ? undefined : { scale: 1.1 }
+                      }
+                      whileTap={
+                        prefersReducedMotion ? undefined : { scale: 0.92 }
+                      }
+                      transition={BUTTON_SPRING}
+                      onPointerDown={stopCardEvent}
+                      onMouseEnter={() => audioEngine.playHover()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        audioEngine.playClick();
+                        onDelete(mission.id);
+                      }}
+                      disabled={isVortexing}
+                      title="Remover missão"
+                      aria-label={`Remover missão ${mission.title}`}
+                      className="rounded-md border border-transparent p-1.5 text-[#52525B] transition-colors hover:border-[#27272A] hover:bg-[#09090B] hover:text-[#EF4444]"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </motion.button>
+                  )}
+
+                  <span
+                    aria-hidden="true"
+                    className="cursor-grab p-1 text-[#52525B] group-hover:text-[#A1A1AA] active:cursor-grabbing"
+                  >
+                    <GripVertical className="h-3.5 w-3.5" />
+                  </span>
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <div className={cn('space-y-1', isCompleted && 'pr-12')}>
+                <h4
                   className={cn(
-                    'rounded-md border p-1.5 transition-colors',
-                    mission.isAmaterasu
-                      ? 'border-[#DC2626]/80 bg-[#000000] text-[#EF4444] hover:bg-[#450A0A]/60'
-                      : 'border-transparent bg-transparent text-[#52525B] hover:border-[#7F1D1D]/60 hover:bg-[#09090B] hover:text-[#DC2626]',
+                    'text-sm leading-snug font-semibold text-[#FAFAFA]',
+                    isCompleted &&
+                      'text-[#A1A1AA] line-through decoration-[#52525B]',
                   )}
                 >
-                  <Flame className="h-3.5 w-3.5" />
-                </motion.button>
-              )}
+                  {mission.title}
+                </h4>
+                {mission.description && (
+                  <p className="line-clamp-2 text-xs leading-relaxed text-[#A1A1AA]">
+                    {mission.description}
+                  </p>
+                )}
+              </div>
+            </div>
 
-              {onDelete && (
+            {/* Gradient Hairline Divider along the Katana Cut Line */}
+            <div
+              aria-hidden="true"
+              className={cn(
+                'h-px w-full',
+                mission.isAmaterasu
+                  ? 'bg-gradient-to-r from-transparent via-[#DC2626]/55 to-transparent'
+                  : 'bg-gradient-to-r from-transparent via-white/[0.12] to-transparent',
+              )}
+            />
+
+            {/* BOTTOM HALF: Metrics Row & Quick Action */}
+            <div
+              data-katana-bottom=""
+              className="space-y-2.5 will-change-transform"
+            >
+              {/* Metrics Row: Estimated Minutes & Chakra Preview */}
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-3 font-mono tabular-nums text-[#A1A1AA]">
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 text-[#7F1D1D]" />
+                    {mission.estimatedMinutes}m
+                  </span>
+                  {mission.completedMinutes > 0 && (
+                    <span className="text-[11px] text-[#52525B]">
+                      ({mission.completedMinutes}m focados)
+                    </span>
+                  )}
+                </div>
+
+                <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold tabular-nums text-[#FAFAFA]">
+                  <Sparkles className="h-3 w-3 text-[#DC2626]" />
+                  +{chakraPreview.toLocaleString('pt-BR')}
+                </span>
+              </div>
+
+              {/* Quick Action: Tragar para o Tsukuyomi */}
+              {onDragToTsukuyomi && (
                 <motion.button
                   type="button"
                   whileHover={
-                    prefersReducedMotion ? undefined : { scale: 1.1 }
+                    prefersReducedMotion || isVortexing
+                      ? undefined
+                      : { y: -1, scale: 1.01 }
                   }
-                  whileTap={prefersReducedMotion ? undefined : { scale: 0.92 }}
+                  whileTap={
+                    prefersReducedMotion || isVortexing
+                      ? undefined
+                      : { scale: 0.98 }
+                  }
                   transition={BUTTON_SPRING}
                   onPointerDown={stopCardEvent}
                   onMouseEnter={() => audioEngine.playHover()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    audioEngine.playClick();
-                    onDelete(mission.id);
-                  }}
+                  onClick={handleTragarClick}
                   disabled={isVortexing}
-                  title="Remover missão"
-                  aria-label={`Remover missão ${mission.title}`}
-                  className="rounded-md border border-transparent p-1.5 text-[#52525B] transition-colors hover:border-[#27272A] hover:bg-[#09090B] hover:text-[#EF4444]"
+                  className={cn(
+                    'flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors',
+                    mission.isAmaterasu
+                      ? 'border-[#DC2626]/70 bg-[#000000] text-[#FAFAFA] hover:border-[#EF4444] hover:bg-[#450A0A]/50'
+                      : isActiveInTemple
+                        ? 'border-[#DC2626]/55 bg-[#450A0A]/30 text-[#FCA5A5] hover:bg-[#450A0A]/55 hover:text-[#FFFFFF]'
+                        : 'border-white/[0.08] bg-gradient-to-b from-[#16161C]/90 to-[#0B0B0E]/95 text-[#A1A1AA] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-[#DC2626]/60 hover:text-[#FAFAFA]',
+                  )}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Eye className="h-3.5 w-3.5 text-[#DC2626]" />
+                  <span>Tragar para o Tsukuyomi</span>
                 </motion.button>
               )}
-
-              <span
-                aria-hidden="true"
-                className="cursor-grab p-1 text-[#52525B] group-hover:text-[#A1A1AA] active:cursor-grabbing"
-              >
-                <GripVertical className="h-3.5 w-3.5" />
-              </span>
             </div>
           </div>
-
-          {/* Title & Description */}
-          <div className="space-y-1">
-            <h4
-              className={cn(
-                'text-sm leading-snug font-semibold text-[#FAFAFA]',
-                isCompleted && 'text-[#A1A1AA] line-through decoration-[#52525B]',
-              )}
-            >
-              {mission.title}
-            </h4>
-            {mission.description && (
-              <p className="line-clamp-2 text-xs leading-relaxed text-[#A1A1AA]">
-                {mission.description}
-              </p>
-            )}
-          </div>
-
-          {/* Metrics Row: Estimated Minutes & Chakra Preview */}
-          <div className="flex items-center justify-between gap-2 border-t border-[#27272A]/80 pt-2.5 text-xs">
-            <div className="flex items-center gap-3 font-mono tabular-nums text-[#A1A1AA]">
-              <span className="inline-flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5 text-[#7F1D1D]" />
-                {mission.estimatedMinutes}m
-              </span>
-              {mission.completedMinutes > 0 && (
-                <span className="text-[11px] text-[#52525B]">
-                  ({mission.completedMinutes}m focados)
-                </span>
-              )}
-            </div>
-
-            <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold tabular-nums text-[#FAFAFA]">
-              <Sparkles className="h-3 w-3 text-[#DC2626]" />
-              +{chakraPreview.toLocaleString('pt-BR')}
-            </span>
-          </div>
-
-          {/* Quick Action: Tragar para o Tsukuyomi */}
-          {onDragToTsukuyomi && (
-            <motion.button
-              type="button"
-              whileHover={
-                prefersReducedMotion || isVortexing
-                  ? undefined
-                  : { y: -1, scale: 1.01 }
-              }
-              whileTap={
-                prefersReducedMotion || isVortexing
-                  ? undefined
-                  : { scale: 0.98 }
-              }
-              transition={BUTTON_SPRING}
-              onPointerDown={stopCardEvent}
-              onMouseEnter={() => audioEngine.playHover()}
-              onClick={handleTragarClick}
-              disabled={isVortexing}
-              className={cn(
-                'flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors',
-                mission.isAmaterasu
-                  ? 'border-[#DC2626]/70 bg-[#000000] text-[#FAFAFA] hover:border-[#EF4444] hover:bg-[#450A0A]/50'
-                  : isActiveInTemple
-                    ? 'border-[#DC2626]/55 bg-[#450A0A]/30 text-[#FCA5A5] hover:bg-[#450A0A]/55 hover:text-[#FFFFFF]'
-                    : 'border-[#27272A] bg-[#09090B]/90 text-[#A1A1AA] hover:border-[#DC2626]/60 hover:bg-[#18181B] hover:text-[#FAFAFA]',
-              )}
-            >
-              <Eye className="h-3.5 w-3.5 text-[#DC2626]" />
-              <span>Tragar para o Tsukuyomi</span>
-            </motion.button>
-          )}
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }

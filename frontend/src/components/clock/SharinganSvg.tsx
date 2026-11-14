@@ -1,6 +1,12 @@
 'use client';
 
-import { useId } from 'react';
+import { useEffect, useId } from 'react';
+import {
+  motion,
+  useAnimate,
+  useReducedMotion,
+  type MotionValue,
+} from 'framer-motion';
 import { cn } from '@/lib/cn';
 import type { EyeStage, MangekyouVariant } from '@/types/tsukuyomi';
 
@@ -11,6 +17,12 @@ export interface SharinganSvgProps {
   isAwakening?: boolean;
   isUrgent?: boolean;
   isSpinBurst?: boolean;
+  pupilDilationNonce?: number;
+  specularParallax?: {
+    x: MotionValue<number>;
+    y: MotionValue<number>;
+  };
+  hideCorneaSpecular?: boolean;
 }
 
 const TOMOE_ANGLES: Record<'tomoe_1' | 'tomoe_2' | 'tomoe_3', readonly number[]> = {
@@ -173,13 +185,35 @@ export function SharinganSvg({
   isAwakening = false,
   isUrgent = false,
   isSpinBurst = false,
+  pupilDilationNonce = 0,
+  specularParallax,
+  hideCorneaSpecular = false,
 }: SharinganSvgProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const [pupilScope, animatePupil] = useAnimate<SVGCircleElement>();
   const rawId = useId();
   const safeId = rawId.replace(/:/g, '');
   const irisGradId = `iris-grad-${safeId}`;
   const normalGradId = `normal-grad-${safeId}`;
   const rinneganGradId = `rinnegan-grad-${safeId}`;
   const shadowGradId = `limbal-shadow-${safeId}`;
+
+  useEffect(() => {
+    if (!pupilDilationNonce || prefersReducedMotion || !pupilScope.current) {
+      return;
+    }
+
+    void animatePupil(
+      pupilScope.current,
+      { scale: [1, 1.18, 0.94, 1] },
+      {
+        type: 'tween',
+        duration: 0.25,
+        times: [0, 0.32, 0.7, 1],
+        ease: [0.22, 1, 0.36, 1],
+      },
+    );
+  }, [pupilDilationNonce, prefersReducedMotion, animatePupil, pupilScope]);
 
   const isRinnegan = stage === 'rinnegan';
   const isNormal = stage === 'normal';
@@ -242,20 +276,33 @@ export function SharinganSvg({
 
       {/* Subtle Organic Iris Striations */}
       {!isRinnegan && (
-        <g stroke="#09090B" strokeWidth="1" strokeOpacity={isNormal ? 0.35 : 0.15}>
-          {Array.from({ length: 16 }, (_, idx) => {
-            const angle = idx * 22.5;
+        <g stroke="#09090B" strokeWidth="1">
+          {Array.from({ length: 24 }, (_, idx) => {
+            const angle = idx * 15;
+            const isMajor = idx % 2 === 0;
             return (
               <line
                 key={angle}
                 x1="100"
-                y1="24"
+                y1={isMajor ? 24 : 28}
                 x2="100"
-                y2="42"
+                y2={isMajor ? 43 : 39}
+                strokeOpacity={
+                  isNormal ? (isMajor ? 0.35 : 0.2) : isMajor ? 0.16 : 0.08
+                }
                 transform={`rotate(${angle} 100 100)`}
               />
             );
           })}
+          <circle
+            cx="100"
+            cy="100"
+            r="32"
+            fill="none"
+            stroke="#09090B"
+            strokeOpacity={isNormal ? 0.25 : 0.12}
+            strokeWidth="1.2"
+          />
         </g>
       )}
 
@@ -356,33 +403,57 @@ export function SharinganSvg({
         />
       )}
 
-      {/* Central Absolute Black Pupil */}
+      {/* Soft Biological Pupil Collarette Shadow */}
       <circle
+        cx="100"
+        cy="100"
+        r={pupilRadius + 3}
+        fill="#09090B"
+        fillOpacity={isNormal ? 0.32 : 0.45}
+      />
+
+      {/* Central Absolute Black Pupil (supports saccadic dilation) */}
+      <circle
+        ref={pupilScope}
         cx="100"
         cy="100"
         r={pupilRadius}
         fill="#000000"
+        style={{
+          transformOrigin: 'center',
+          transformBox: 'fill-box',
+        }}
       />
 
-      {/* Wet-lens Asymmetric Specular Highlights */}
-      <ellipse
-        cx="84"
-        cy="79"
-        rx="6.8"
-        ry="3.6"
-        transform="rotate(-32 84 79)"
-        fill="#FFFFFF"
-        fillOpacity={isNormal ? 0.34 : 0.48}
-      />
-      <circle cx="115" cy="116" r="2.1" fill="#FFFFFF" fillOpacity="0.22" />
-      <path
-        d="M 52 58 A 66 66 0 0 1 82 38"
-        fill="none"
-        stroke="#FFFFFF"
-        strokeOpacity={isNormal ? 0.1 : 0.16}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+      {/* Wet-lens Asymmetric Specular Highlights (for standalone rendering) */}
+      {!hideCorneaSpecular && (
+        <motion.g
+          style={
+            specularParallax
+              ? { x: specularParallax.x, y: specularParallax.y }
+              : undefined
+          }
+        >
+          <ellipse
+            cx="84"
+            cy="79"
+            rx="6.8"
+            ry="3.6"
+            transform="rotate(-32 84 79)"
+            fill="#FFFFFF"
+            fillOpacity={isNormal ? 0.34 : 0.48}
+          />
+          <circle cx="115" cy="116" r="2.1" fill="#FFFFFF" fillOpacity="0.22" />
+          <path
+            d="M 52 58 A 66 66 0 0 1 82 38"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeOpacity={isNormal ? 0.1 : 0.16}
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+        </motion.g>
+      )}
     </svg>
   );
 }

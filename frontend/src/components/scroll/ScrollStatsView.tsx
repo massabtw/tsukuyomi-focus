@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef } from 'react';
+import Image from 'next/image';
 import {
   Clock,
   Crosshair,
@@ -30,6 +31,9 @@ const KPI_SPRING = {
   stiffness: 330,
   damping: 24,
 } as const;
+
+const OBSIDIAN_CARD_CLASS =
+  'bg-gradient-to-b from-[#141418]/90 via-[#0C0C0F]/95 to-[#070709]/98 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] border border-white/[0.06] hover:border-red-500/30 transition-colors';
 
 function formatHoursAndMinutes(totalMinutes: number): string {
   const safe = Math.max(0, Math.round(totalMinutes));
@@ -80,6 +84,17 @@ export function ScrollStatsView() {
       ref={containerRef}
       className="relative mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8"
     >
+      {/* Monumental Engraved Japanese Kanji Watermark: 記録 (Archive / Record) */}
+      <motion.div
+        aria-hidden="true"
+        style={{ y: bgParallaxY, ...WILL_CHANGE_TRANSFORM }}
+        className="pointer-events-none select-none absolute inset-x-0 top-4 -z-10 flex justify-center overflow-hidden"
+      >
+        <span className="font-serif text-[12rem] font-black leading-none tracking-tight text-white opacity-[0.03] sm:text-[18rem] lg:text-[21rem]">
+          記録
+        </span>
+      </motion.div>
+
       {/* Camera-descent background archive geometry */}
       <motion.div
         aria-hidden="true"
@@ -117,7 +132,10 @@ export function ScrollStatsView() {
           whileTap={kpiTap}
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
-          className="obsidian-surface will-change-transform rounded-2xl p-5"
+          className={cn(
+            'will-change-transform rounded-2xl p-5',
+            OBSIDIAN_CARD_CLASS,
+          )}
         >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Tempo Total no Tsukuyomi</span>
@@ -138,7 +156,10 @@ export function ScrollStatsView() {
           whileTap={kpiTap}
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
-          className="obsidian-surface will-change-transform rounded-2xl p-5"
+          className={cn(
+            'will-change-transform rounded-2xl p-5',
+            OBSIDIAN_CARD_CLASS,
+          )}
         >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Chakra Total &amp; Estágio Ocular</span>
@@ -159,7 +180,10 @@ export function ScrollStatsView() {
           whileTap={kpiTap}
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
-          className="obsidian-surface will-change-transform rounded-2xl p-5"
+          className={cn(
+            'will-change-transform rounded-2xl p-5',
+            OBSIDIAN_CARD_CLASS,
+          )}
         >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Ofensiva Diária (Streak)</span>
@@ -186,7 +210,10 @@ export function ScrollStatsView() {
           whileTap={kpiTap}
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
-          className="obsidian-surface will-change-transform rounded-2xl p-5"
+          className={cn(
+            'will-change-transform rounded-2xl p-5',
+            OBSIDIAN_CARD_CLASS,
+          )}
         >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Precisão Uchiha</span>
@@ -207,7 +234,10 @@ export function ScrollStatsView() {
           whileTap={kpiTap}
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
-          className="obsidian-surface will-change-transform rounded-2xl p-5"
+          className={cn(
+            'will-change-transform rounded-2xl p-5',
+            OBSIDIAN_CARD_CLASS,
+          )}
         >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Invocações do Izanagi</span>
@@ -221,24 +251,40 @@ export function ScrollStatsView() {
           </p>
         </motion.article>
 
-        {/* 6. Amaterasu Completed (strict #000000 / #DC2626 palette) */}
+        {/* 6. Amaterasu Completed (strict #000000 / #DC2626 palette + black flames VFX) */}
         <motion.article
           whileHover={kpiHover}
           whileTap={kpiTap}
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
-          className="amaterasu-frame will-change-transform rounded-2xl p-5"
+          className="amaterasu-frame will-change-transform relative overflow-hidden rounded-2xl border border-red-600/45 bg-gradient-to-b from-[#140709]/92 via-[#090406]/96 to-[#000000]/98 p-5 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] hover:border-red-500/60 transition-colors"
         >
-          <div className="flex items-center justify-between text-xs text-zinc-300">
-            <span>Missões Amaterasu Concluídas</span>
-            <Flame className="h-4 w-4 text-[#DC2626]" aria-hidden="true" />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+          >
+            <Image
+              src="/assets/vfx/amaterasu-black-flames.webp"
+              alt=""
+              fill
+              unoptimized
+              className="object-cover object-center opacity-35 mix-blend-screen [mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_98%)]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
           </div>
-          <p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-white tabular-nums sm:text-3xl">
-            {stats.amaterasuCompletedCount}
-          </p>
-          <p className="mt-1.5 text-xs text-red-400/90">
-            Chamas negras seladas com bônus 2.0x
-          </p>
+
+          <div className="relative z-10">
+            <div className="flex items-center justify-between text-xs text-zinc-300">
+              <span>Missões Amaterasu Concluídas</span>
+              <Flame className="h-4 w-4 text-[#DC2626]" aria-hidden="true" />
+            </div>
+            <p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-white tabular-nums sm:text-3xl">
+              {stats.amaterasuCompletedCount}
+            </p>
+            <p className="mt-1.5 text-xs text-red-400/90">
+              Chamas negras seladas com bônus 2.0x
+            </p>
+          </div>
         </motion.article>
       </section>
 

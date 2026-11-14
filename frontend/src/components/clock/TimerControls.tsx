@@ -36,6 +36,49 @@ const CONTROL_SPRING = {
   damping: 26,
 } as const;
 
+const KATANA_BUTTON_VARIANTS = {
+  rest: { y: 0 },
+  hover: { y: -1, transition: CONTROL_SPRING },
+};
+
+const KATANA_BEAM_VARIANTS = {
+  rest: { left: '-16%', opacity: 0 },
+  hover: {
+    left: ['-16%', '116%'],
+    opacity: [0, 1, 0],
+    transition: {
+      duration: 0.18,
+      ease: [0.16, 1, 0.3, 1] as const,
+      type: 'tween' as const,
+    },
+  },
+};
+
+const KATANA_SPLIT_VARIANTS = {
+  rest: { x: 0, y: 0 },
+  hover: {
+    x: [0, 2.5, 0],
+    y: [0, -0.5, 0],
+    transition: {
+      duration: 0.18,
+      ease: [0.16, 1, 0.3, 1] as const,
+      type: 'tween' as const,
+    },
+  },
+};
+
+function KatanaSlashOverlay({ enabled }: { enabled: boolean }) {
+  if (!enabled) return null;
+  return (
+    <motion.span
+      aria-hidden="true"
+      variants={KATANA_BEAM_VARIANTS}
+      style={{ rotate: '35deg' }}
+      className="pointer-events-none absolute -top-1/2 h-[220%] w-[2px] bg-gradient-to-b from-transparent via-white to-transparent shadow-[0_0_12px_rgba(255,255,255,0.95),0_0_20px_rgba(239,68,68,0.75)]"
+    />
+  );
+}
+
 export function TimerControls({
   onOpenSusanooBreak,
   onOpenIzanagiAbandon,
@@ -94,22 +137,19 @@ export function TimerControls({
       : {};
 
   return (
-    <div className="obsidian-surface w-full rounded-xl p-4 sm:p-5">
-      {/* Presets Row */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[11px] font-medium tracking-[0.18em] text-zinc-400 uppercase">
-            Ritual de Tempo
-          </span>
-          {!isIdle && (
-            <span className="text-[11px] text-zinc-500">
-              Presets bloqueados durante ciclo ativo
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* Focus Presets */}
+    <div
+      role="region"
+      aria-label="Controles do Tsukuyomi"
+      className="flex w-full flex-col items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/65 px-4 py-3 shadow-[0_24px_60px_rgba(0,0,0,0.9),0_0_32px_var(--chakra-glow,rgba(220,38,38,0.18))] backdrop-blur-2xl transition-colors duration-700 lg:flex-row"
+    >
+      {/* Left: Presets Segmented Track + Break Pills + Active Mission Suggestion */}
+      <div className="flex flex-wrap items-center justify-center gap-2 lg:justify-start">
+        {/* Focus Presets Track */}
+        <div
+          role="group"
+          aria-label="Duração de foco"
+          className="flex items-center gap-0.5 rounded-xl border border-white/10 bg-black/60 p-1"
+        >
           {TIMER_PRESETS_MINUTES.focus.map((minutes) => {
             const active = isFocus && durationMinutes === minutes;
             return (
@@ -126,10 +166,10 @@ export function TimerControls({
                   setTimerMode('focus', minutes * 60);
                 }}
                 className={cn(
-                  'rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors will-change-transform',
+                  'rounded-lg border px-2 py-1 font-mono text-[11px] tabular-nums transition-colors duration-700 will-change-transform',
                   active
-                    ? 'border-red-600/80 bg-red-950/50 text-zinc-50'
-                    : 'border-zinc-800 bg-zinc-950/70 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
+                    ? 'border-[var(--chakra-primary,#DC2626)] bg-white/[0.08] text-white shadow-[0_0_14px_var(--chakra-glow,rgba(220,38,38,0.42))]'
+                    : 'border-transparent text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100',
                   !isIdle && 'cursor-not-allowed opacity-50',
                 )}
               >
@@ -137,42 +177,17 @@ export function TimerControls({
               </motion.button>
             );
           })}
+        </div>
 
-          {/* Mission Rank Auto Preset */}
-          {activeMission && missionMinutes !== null && missionRankDef && (
-            <motion.button
-              type="button"
-              disabled={!isIdle}
-              {...idleOnlyMotionProps}
-              onMouseEnter={() => {
-                if (isIdle) audioEngine.playHover();
-              }}
-              onClick={() => {
-                audioEngine.playClick();
-                setTimerMode('focus', missionMinutes * 60);
-              }}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors will-change-transform',
-                isFocus && durationMinutes === missionMinutes
-                  ? 'border-red-600/80 bg-red-950/50 text-zinc-50'
-                  : 'border-zinc-800 bg-zinc-950/70 text-zinc-300 hover:border-zinc-700',
-                !isIdle && 'cursor-not-allowed opacity-50',
-              )}
-              title={`Usar duração sugerida da missão (${missionRankDef.label})`}
-            >
-              <Sparkles className="h-3 w-3 text-red-400" aria-hidden="true" />
-              <span>
-                Rank {activeMission.rank} ({missionMinutes}m)
-              </span>
-            </motion.button>
-          )}
-
-          <div
-            className="mx-1 hidden h-4 w-px bg-zinc-800 sm:block"
-            aria-hidden="true"
-          />
-
-          {/* Short Break Presets */}
+        {/* Break Presets Track */}
+        <div
+          role="group"
+          aria-label="Duração de pausa"
+          className="flex items-center gap-0.5 rounded-xl border border-white/10 bg-black/60 p-1"
+        >
+          <span className="px-1.5 text-[10px] font-medium tracking-wider text-zinc-500 uppercase">
+            Pausa
+          </span>
           {TIMER_PRESETS_MINUTES.shortBreak.map((minutes) => {
             const active =
               mode === 'short_break' && durationMinutes === minutes;
@@ -181,6 +196,8 @@ export function TimerControls({
                 key={`short-${minutes}`}
                 type="button"
                 disabled={!isIdle}
+                title={`Pausa curta de ${minutes} minutos`}
+                aria-label={`Pausa curta ${minutes}m`}
                 {...idleOnlyMotionProps}
                 onMouseEnter={() => {
                   if (isIdle) audioEngine.playHover();
@@ -190,19 +207,17 @@ export function TimerControls({
                   setTimerMode('short_break', minutes * 60);
                 }}
                 className={cn(
-                  'rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors will-change-transform',
+                  'rounded-lg border px-2 py-1 font-mono text-[11px] tabular-nums transition-colors duration-700 will-change-transform',
                   active
-                    ? 'border-red-600/70 bg-red-950/40 text-zinc-100'
-                    : 'border-zinc-800 bg-zinc-950/70 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
+                    ? 'border-[var(--chakra-primary,#DC2626)] bg-white/[0.08] text-white shadow-[0_0_14px_var(--chakra-glow,rgba(220,38,38,0.42))]'
+                    : 'border-transparent text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100',
                   !isIdle && 'cursor-not-allowed opacity-50',
                 )}
               >
-                Pausa {minutes}m
+                {minutes}m
               </motion.button>
             );
           })}
-
-          {/* Long Break Presets */}
           {TIMER_PRESETS_MINUTES.longBreak.map((minutes) => {
             const active = mode === 'long_break' && durationMinutes === minutes;
             return (
@@ -210,6 +225,8 @@ export function TimerControls({
                 key={`long-${minutes}`}
                 type="button"
                 disabled={!isIdle}
+                title={`Pausa longa de ${minutes} minutos`}
+                aria-label={`Pausa longa ${minutes}m`}
                 {...idleOnlyMotionProps}
                 onMouseEnter={() => {
                   if (isIdle) audioEngine.playHover();
@@ -219,53 +236,23 @@ export function TimerControls({
                   setTimerMode('long_break', minutes * 60);
                 }}
                 className={cn(
-                  'rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors will-change-transform',
+                  'rounded-lg border px-2 py-1 font-mono text-[11px] tabular-nums transition-colors duration-700 will-change-transform',
                   active
-                    ? 'border-red-600/70 bg-red-950/40 text-zinc-100'
-                    : 'border-zinc-800 bg-zinc-950/70 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
+                    ? 'border-[var(--chakra-primary,#DC2626)] bg-white/[0.08] text-white shadow-[0_0_14px_var(--chakra-glow,rgba(220,38,38,0.42))]'
+                    : 'border-transparent text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100',
                   !isIdle && 'cursor-not-allowed opacity-50',
                 )}
               >
-                Longa {minutes}m
+                {minutes}m
               </motion.button>
             );
           })}
         </div>
-      </div>
 
-      {/* Susano'o Deep Work Shield Toggle */}
-      {isFocus && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800/90 border-t-white/[0.06] bg-zinc-950/70 px-3.5 py-2.5">
-          <div className="flex items-start gap-2.5">
-            <Shield
-              className={cn(
-                'mt-0.5 h-4 w-4 shrink-0',
-                susanooEnabled ? 'text-red-400' : 'text-zinc-500',
-              )}
-              aria-hidden="true"
-            />
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-zinc-100">
-                  Armadura Susano&apos;o (+25% Chakra)
-                </span>
-                {susanooRecommended && (
-                  <span className="rounded border border-red-500/30 bg-red-950/40 px-1.5 py-0.5 text-[10px] font-medium text-red-400">
-                    Recomendado &ge; 50m
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-zinc-400">
-                Sela pausa e abandono normal até o fim do ciclo.
-              </p>
-            </div>
-          </div>
-
+        {/* Active Mission Suggestion Chip */}
+        {activeMission && missionMinutes !== null && missionRankDef && (
           <motion.button
             type="button"
-            role="switch"
-            aria-checked={susanooEnabled}
-            aria-label="Ativar Armadura Susano'o"
             disabled={!isIdle}
             {...idleOnlyMotionProps}
             onMouseEnter={() => {
@@ -273,44 +260,140 @@ export function TimerControls({
             }}
             onClick={() => {
               audioEngine.playClick();
-              setSusanooEnabled(!susanooEnabled);
+              setTimerMode('focus', missionMinutes * 60);
             }}
             className={cn(
-              'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors will-change-transform',
-              susanooEnabled
-                ? 'border-red-500/70 bg-red-700/80'
-                : 'border-zinc-700 bg-zinc-900',
-              !isIdle && 'cursor-not-allowed opacity-60',
+              'inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-[11px] tabular-nums transition-colors duration-700 will-change-transform',
+              isFocus && durationMinutes === missionMinutes
+                ? 'border-[var(--chakra-primary,#DC2626)] bg-white/[0.08] text-white shadow-[0_0_14px_var(--chakra-glow,rgba(220,38,38,0.42))]'
+                : 'border-white/10 bg-black/60 text-zinc-300 hover:border-white/25 hover:text-white',
+              !isIdle && 'cursor-not-allowed opacity-50',
             )}
+            title={`Usar duração sugerida da missão (${missionRankDef.label})`}
+          >
+            <Sparkles
+              className="h-3 w-3 shrink-0 transition-colors duration-700"
+              style={{ color: 'var(--chakra-primary, #DC2626)' }}
+              aria-hidden="true"
+            />
+            <span>
+              Rank {activeMission.rank} · {missionMinutes}m
+            </span>
+          </motion.button>
+        )}
+      </div>
+
+      {/* Center: Compact Armadura Susano'o Toggle */}
+      {isFocus && (
+        <motion.button
+          type="button"
+          role="switch"
+          aria-checked={susanooEnabled}
+          aria-label="Ativar Armadura Susano'o"
+          title={
+            susanooRecommended
+              ? "Armadura Susano'o (+25% Chakra · Recomendado >= 50m)"
+              : "Armadura Susano'o (+25% Chakra · Sela pausa e abandono normal até o fim do ciclo)"
+          }
+          disabled={!isIdle}
+          {...idleOnlyMotionProps}
+          onMouseEnter={() => {
+            if (isIdle) audioEngine.playHover();
+          }}
+          onClick={() => {
+            audioEngine.playClick();
+            setSusanooEnabled(!susanooEnabled);
+          }}
+          className={cn(
+            'inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors duration-700 will-change-transform',
+            susanooEnabled
+              ? 'border-[var(--chakra-primary,#DC2626)] bg-white/[0.08] text-white shadow-[0_0_16px_var(--chakra-glow,rgba(220,38,38,0.42))]'
+              : 'border-white/10 bg-black/60 text-zinc-300 hover:border-white/25 hover:text-white',
+            !isIdle && 'cursor-not-allowed opacity-60',
+          )}
+        >
+          <Shield
+            className="h-3.5 w-3.5 shrink-0 transition-colors duration-700"
+            style={{
+              color: susanooEnabled
+                ? 'var(--chakra-primary, #DC2626)'
+                : '#71717A',
+            }}
+            aria-hidden="true"
+          />
+          <span className="whitespace-nowrap">Armadura Susano&apos;o</span>
+          <span
+            className={cn(
+              'rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums transition-colors duration-700',
+              susanooEnabled
+                ? 'border-[var(--chakra-primary,#DC2626)] bg-black/50 text-white'
+                : 'border-white/10 bg-black/40 text-zinc-400',
+            )}
+          >
+            +25%
+          </span>
+          <span
+            aria-hidden="true"
+            className={cn(
+              'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full border transition-colors duration-700',
+              susanooEnabled
+                ? 'border-white/30'
+                : 'border-white/15 bg-zinc-900',
+            )}
+            style={
+              susanooEnabled
+                ? { backgroundColor: 'var(--chakra-primary, #DC2626)' }
+                : undefined
+            }
           >
             <span
               className={cn(
-                'inline-block h-4 w-4 transform rounded-full bg-zinc-100 transition-transform',
-                susanooEnabled ? 'translate-x-6' : 'translate-x-1',
+                'inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform duration-200',
+                susanooEnabled ? 'translate-x-3.5' : 'translate-x-0.5',
               )}
             />
-          </motion.button>
-        </div>
+          </span>
+        </motion.button>
       )}
 
-      {/* Primary Action Controls */}
-      <div className="mt-4 flex flex-wrap items-center gap-2.5">
+      {/* Right: Primary & Active Cycle Actions */}
+      <div className="flex flex-wrap items-center justify-center gap-2 shrink-0">
         {isIdle && (
           <>
             <motion.button
               type="button"
-              {...activeMotionProps}
+              variants={prefersReducedMotion ? undefined : KATANA_BUTTON_VARIANTS}
+              initial="rest"
+              whileHover={prefersReducedMotion ? undefined : 'hover'}
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+              transition={CONTROL_SPRING}
               onMouseEnter={() => audioEngine.playHover()}
               onClick={() => {
-                audioEngine.playClick();
+                if (!isFocus) {
+                  audioEngine.playClick();
+                }
                 startTimer();
               }}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-500/50 bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(220,38,38,0.35)] transition-colors hover:bg-red-500 will-change-transform"
+              style={{
+                backgroundColor: 'var(--chakra-primary, #DC2626)',
+                borderColor: 'rgba(255, 255, 255, 0.24)',
+                boxShadow:
+                  'inset 0 1px 0 0 rgba(255, 255, 255, 0.24), 0 0 24px var(--chakra-glow, rgba(220, 38, 38, 0.42))',
+              }}
+              className="relative inline-flex items-center justify-center overflow-hidden rounded-xl border px-4 py-2 text-xs font-semibold whitespace-nowrap text-white transition-colors duration-700 hover:brightness-110 will-change-transform"
             >
-              <Play className="h-4 w-4 fill-current" aria-hidden="true" />
-              <span>
-                {isFocus ? 'Ativar Tsukuyomi' : 'Iniciar Repouso Ocular'}
-              </span>
+              <KatanaSlashOverlay enabled={!prefersReducedMotion} />
+              <motion.span
+                variants={
+                  prefersReducedMotion ? undefined : KATANA_SPLIT_VARIANTS
+                }
+                className="relative z-10 inline-flex items-center gap-2"
+              >
+                <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                <span>
+                  {isFocus ? 'Iniciar Tsukuyomi' : 'Iniciar Repouso Ocular'}
+                </span>
+              </motion.span>
             </motion.button>
 
             <motion.button
@@ -322,7 +405,7 @@ export function TimerControls({
                 resetTimer();
               }}
               aria-label="Resetar cronômetro"
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 will-change-transform"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-xs font-medium whitespace-nowrap text-zinc-300 transition-colors hover:border-white/25 hover:text-white will-change-transform"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Resetar</span>
@@ -331,26 +414,42 @@ export function TimerControls({
         )}
 
         {!isIdle && isSusanooSealed && (
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-red-900/60 bg-black/70 px-3 py-2 text-xs text-red-300">
-              <Lock className="h-3.5 w-3.5 text-red-400" aria-hidden="true" />
-              <span>Selo Susano&apos;o ativo — pausa bloqueada</span>
+          <>
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/70 px-2.5 py-2 text-[11px] whitespace-nowrap text-zinc-300">
+              <Lock
+                className="h-3.5 w-3.5 transition-colors duration-700"
+                style={{ color: 'var(--chakra-primary, #DC2626)' }}
+                aria-hidden="true"
+              />
+              <span>Selo ativo</span>
             </div>
 
             <motion.button
               type="button"
-              {...activeMotionProps}
+              variants={prefersReducedMotion ? undefined : KATANA_BUTTON_VARIANTS}
+              initial="rest"
+              whileHover={prefersReducedMotion ? undefined : 'hover'}
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+              transition={CONTROL_SPRING}
               onMouseEnter={() => audioEngine.playHover()}
               onClick={() => {
                 audioEngine.playClick();
                 onOpenSusanooBreak();
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-600/70 bg-black px-4 py-2.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-950/50 hover:text-red-300 will-change-transform"
+              className="relative inline-flex items-center justify-center overflow-hidden rounded-xl border border-red-600/70 bg-black/80 px-3.5 py-2 text-xs font-semibold whitespace-nowrap text-red-400 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] transition-colors hover:bg-red-950/50 hover:text-red-300 will-change-transform"
             >
-              <ShieldAlert className="h-4 w-4" aria-hidden="true" />
-              <span>Quebrar Selo do Susano&apos;o</span>
+              <KatanaSlashOverlay enabled={!prefersReducedMotion} />
+              <motion.span
+                variants={
+                  prefersReducedMotion ? undefined : KATANA_SPLIT_VARIANTS
+                }
+                className="relative z-10 inline-flex items-center gap-1.5"
+              >
+                <ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Quebrar Selo do Susano&apos;o</span>
+              </motion.span>
             </motion.button>
-          </div>
+          </>
         )}
 
         {!isIdle && !isSusanooSealed && (
@@ -358,30 +457,59 @@ export function TimerControls({
             {isRunning ? (
               <motion.button
                 type="button"
-                {...activeMotionProps}
+                variants={prefersReducedMotion ? undefined : KATANA_BUTTON_VARIANTS}
+                initial="rest"
+                whileHover={prefersReducedMotion ? undefined : 'hover'}
+                whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+                transition={CONTROL_SPRING}
                 onMouseEnter={() => audioEngine.playHover()}
                 onClick={() => {
                   audioEngine.playClick();
                   pauseTimer();
                 }}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-zinc-100 transition-colors hover:border-zinc-600 hover:bg-zinc-800 will-change-transform"
+                className="relative inline-flex items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-zinc-900/90 px-4 py-2 text-xs font-semibold whitespace-nowrap text-zinc-100 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] transition-colors hover:border-white/30 hover:bg-zinc-800 will-change-transform"
               >
-                <Pause className="h-4 w-4" aria-hidden="true" />
-                <span>Pausar</span>
+                <KatanaSlashOverlay enabled={!prefersReducedMotion} />
+                <motion.span
+                  variants={
+                    prefersReducedMotion ? undefined : KATANA_SPLIT_VARIANTS
+                  }
+                  className="relative z-10 inline-flex items-center gap-1.5"
+                >
+                  <Pause className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Pausar</span>
+                </motion.span>
               </motion.button>
             ) : isPaused ? (
               <motion.button
                 type="button"
-                {...activeMotionProps}
+                variants={prefersReducedMotion ? undefined : KATANA_BUTTON_VARIANTS}
+                initial="rest"
+                whileHover={prefersReducedMotion ? undefined : 'hover'}
+                whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+                transition={CONTROL_SPRING}
                 onMouseEnter={() => audioEngine.playHover()}
                 onClick={() => {
-                  audioEngine.playClick();
                   startTimer();
                 }}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-500/50 bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500 will-change-transform"
+                style={{
+                  backgroundColor: 'var(--chakra-primary, #DC2626)',
+                  borderColor: 'rgba(255, 255, 255, 0.24)',
+                  boxShadow:
+                    'inset 0 1px 0 0 rgba(255, 255, 255, 0.24), 0 0 24px var(--chakra-glow, rgba(220, 38, 38, 0.42))',
+                }}
+                className="relative inline-flex items-center justify-center overflow-hidden rounded-xl border px-4 py-2 text-xs font-semibold whitespace-nowrap text-white transition-colors duration-700 hover:brightness-110 will-change-transform"
               >
-                <Play className="h-4 w-4 fill-current" aria-hidden="true" />
-                <span>Retomar</span>
+                <KatanaSlashOverlay enabled={!prefersReducedMotion} />
+                <motion.span
+                  variants={
+                    prefersReducedMotion ? undefined : KATANA_SPLIT_VARIANTS
+                  }
+                  className="relative z-10 inline-flex items-center gap-1.5"
+                >
+                  <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                  <span>Retomar</span>
+                </motion.span>
               </motion.button>
             ) : null}
 
@@ -394,9 +522,9 @@ export function TimerControls({
                   audioEngine.playClick();
                   abandonActiveCycle();
                 }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 will-change-transform"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-black/60 px-3.5 py-2 text-xs font-medium whitespace-nowrap text-zinc-300 transition-colors hover:border-white/25 hover:text-white will-change-transform"
               >
-                <XCircle className="h-4 w-4" aria-hidden="true" />
+                <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>Encerrar Pausa</span>
               </motion.button>
             ) : (
@@ -410,10 +538,10 @@ export function TimerControls({
                       audioEngine.playClick();
                       onOpenIzanagiAbandon();
                     }}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/40 bg-red-950/35 px-3.5 py-2.5 text-xs font-medium text-red-300 transition-colors hover:border-red-500/70 hover:bg-red-950/60 will-change-transform"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-500/40 bg-red-950/35 px-3 py-2 text-xs font-medium whitespace-nowrap text-red-300 transition-colors hover:border-red-500/70 hover:bg-red-950/60 will-change-transform"
                     title="Reescrever abandono sacrificando visão temporária em vez de perder acuidade"
                   >
-                    <Eye className="h-4 w-4 text-red-400" aria-hidden="true" />
+                    <Eye className="h-3.5 w-3.5 text-red-400" aria-hidden="true" />
                     <span>Invocar Izanagi</span>
                   </motion.button>
                 )}
@@ -426,10 +554,10 @@ export function TimerControls({
                     audioEngine.playClick();
                     abandonActiveCycle({ useIzanagi: false });
                   }}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs font-medium text-zinc-400 transition-colors hover:border-red-900/70 hover:text-red-300 will-change-transform"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-xs font-medium whitespace-nowrap text-zinc-400 transition-colors hover:border-red-900/70 hover:text-red-300 will-change-transform"
                   title="Abandonar ciclo (+1 desgaste visual)"
                 >
-                  <XCircle className="h-4 w-4" aria-hidden="true" />
+                  <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Abandonar</span>
                 </motion.button>
               </>

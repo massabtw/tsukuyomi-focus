@@ -7,6 +7,105 @@ import { SUSANOO_BREAK_PHRASE } from '@/constants/ranks';
 import { canInvokeIzanagi } from '@/lib/gamification';
 import { useTsukuyomiStore } from '@/store/useTsukuyomiStore';
 
+const SEALING_RUNES =
+  '封印 · 月読 · 禁術 · 須佐能乎 · 伊邪那岐 · 写輪眼 · 封印 · 月読 · 禁術 · 須佐能乎';
+
+const SEALING_RUNE_REPEATS = [0, 1, 2, 3, 4, 5] as const;
+
+const SEALING_BANDS = [
+  {
+    id: 'upper',
+    positionClass: 'top-[10%] sm:top-[12%] -rotate-12',
+    xKeyframes: ['0%', '-50%'] as [string, string],
+    duration: 42,
+  },
+  {
+    id: 'lower',
+    positionClass: 'bottom-[10%] sm:bottom-[12%] rotate-12',
+    xKeyframes: ['-50%', '0%'] as [string, string],
+    duration: 46,
+  },
+] as const;
+
+/**
+ * Shared optical crimson vignette and diagonal Fuinjutsu sealing bands
+ * rendered behind the translucent obsidian dialog card.
+ */
+export function CinematicModalBackdropEffects({
+  prefersReducedMotion,
+}: {
+  prefersReducedMotion: boolean | null;
+}) {
+  const reduced = Boolean(prefersReducedMotion);
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+    >
+      {/* Pulsing crimson edge vignette */}
+      <motion.div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(circle at center, transparent 42%, rgba(127, 29, 29, 0.36) 76%, rgba(220, 38, 38, 0.62) 100%)',
+          boxShadow: 'inset 0 0 110px rgba(220, 38, 38, 0.48)',
+        }}
+        initial={{ opacity: reduced ? 0.75 : 0.55 }}
+        animate={reduced ? { opacity: 0.75 } : { opacity: [0.55, 0.95, 0.55] }}
+        transition={
+          reduced
+            ? { duration: 0 }
+            : {
+                type: 'tween',
+                duration: 3,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }
+        }
+      />
+
+      {/* Diagonal Fuinjutsu ninja sealing bands */}
+      {SEALING_BANDS.map((band) => (
+        <div
+          key={band.id}
+          className={`absolute -left-[25%] w-[150%] overflow-hidden border-y border-red-500/35 bg-black/45 py-1.5 shadow-[0_0_24px_rgba(220,38,38,0.22)] ${band.positionClass}`}
+        >
+          <motion.div
+            className="will-change-transform flex w-max items-center whitespace-nowrap font-mono text-[11px] font-medium tracking-[0.35em] text-red-400/50 select-none"
+            initial={{ x: reduced ? '0%' : band.xKeyframes[0] }}
+            animate={reduced ? { x: '0%' } : { x: band.xKeyframes }}
+            transition={
+              reduced
+                ? { duration: 0 }
+                : {
+                    type: 'tween',
+                    duration: band.duration,
+                    ease: 'linear',
+                    repeat: Infinity,
+                  }
+            }
+          >
+            {[0, 1].map((copyIndex) => (
+              <div key={copyIndex} className="flex shrink-0 items-center">
+                {SEALING_RUNE_REPEATS.map((repeatIndex) => (
+                  <span
+                    key={repeatIndex}
+                    className="inline-flex shrink-0 items-center"
+                  >
+                    <span>{SEALING_RUNES}</span>
+                    <span className="px-2 text-red-500/60">·</span>
+                  </span>
+                ))}
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SusanooBreakModal({
   isOpen,
   onClose,
@@ -68,8 +167,12 @@ export function SusanooBreakModal({
           exit={{ opacity: 0 }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
           onClick={handleClose}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/65 p-4 backdrop-blur-xl"
         >
+          {/* position: fixed already scopes absolute backdrop layers; avoid Tailwind `relative` overriding `fixed` */}
+          <CinematicModalBackdropEffects
+            prefersReducedMotion={prefersReducedMotion}
+          />
           <motion.div
             key="susanoo-break-dialog"
             role="dialog"
@@ -96,7 +199,7 @@ export function SusanooBreakModal({
                 : { type: 'spring', stiffness: 300, damping: 26 }
             }
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg rounded-2xl border border-red-900/70 border-t-red-500/30 bg-[#09090B] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.95)] sm:p-7"
+            className="relative z-10 w-full max-w-lg rounded-2xl border border-red-500/30 bg-[#09090B]/80 p-6 shadow-[0_25px_70px_rgba(0,0,0,0.95),0_0_40px_rgba(220,38,38,0.2)] backdrop-blur-2xl sm:p-7"
           >
             <button
               type="button"

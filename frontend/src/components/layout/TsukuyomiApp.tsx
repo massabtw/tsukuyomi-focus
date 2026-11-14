@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { AwakeningModal } from '@/components/evolution/AwakeningModal';
 import { NakaShrineView } from '@/components/evolution/NakaShrineView';
@@ -21,9 +21,51 @@ import {
   useActiveTab,
   useHasHydrated,
   useIsTsukuyomiMode,
+  useOcularProfile,
+  useTimerCore,
   useTsukuyomiStore,
 } from '@/store/useTsukuyomiStore';
-import type { IzanagiTriggerContext } from '@/types/tsukuyomi';
+import type { IzanagiTriggerContext, MangekyouVariant } from '@/types/tsukuyomi';
+
+interface ChakraPalette {
+  primary: string;
+  glow: string;
+  rgb: string;
+}
+
+type ChakraCssVars = CSSProperties &
+  Record<
+    '--chakra-primary' | '--chakra-color' | '--chakra-glow' | '--chakra-rgb',
+    string
+  >;
+
+const UCHIHA_CHAKRA_PALETTES: Record<MangekyouVariant, ChakraPalette> = {
+  itachi: {
+    primary: '#DC2626',
+    glow: 'rgba(220, 38, 38, 0.42)',
+    rgb: '220, 38, 38',
+  },
+  sasuke: {
+    primary: '#8B5CF6',
+    glow: 'rgba(139, 92, 246, 0.42)',
+    rgb: '139, 92, 246',
+  },
+  shisui: {
+    primary: '#10B981',
+    glow: 'rgba(16, 185, 129, 0.42)',
+    rgb: '16, 185, 129',
+  },
+  madara: {
+    primary: '#2563EB',
+    glow: 'rgba(37, 99, 235, 0.42)',
+    rgb: '37, 99, 235',
+  },
+  obito: {
+    primary: '#0EA5E9',
+    glow: 'rgba(14, 165, 233, 0.42)',
+    rgb: '14, 165, 233',
+  },
+};
 
 const DOLLY_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 const WILL_CHANGE_TAB = { willChange: 'transform, opacity, filter' } as const;
@@ -70,6 +112,8 @@ export function TsukuyomiApp() {
   const hasHydrated = useHasHydrated();
   const activeTab = useActiveTab();
   const isTsukuyomiMode = useIsTsukuyomiMode();
+  const { mangekyouVariant } = useOcularProfile();
+  const { susanooEnabled, mode: timerMode } = useTimerCore();
   const visualBlurLevel = useTsukuyomiStore((state) => state.visualBlurLevel);
   const pendingIzanagiRescue = useTsukuyomiStore(
     (state) => state.pendingIzanagiRescue,
@@ -77,6 +121,21 @@ export function TsukuyomiApp() {
   const declineStreakRescue = useTsukuyomiStore(
     (state) => state.declineStreakRescue,
   );
+
+  const chakraPalette =
+    UCHIHA_CHAKRA_PALETTES[mangekyouVariant] ?? UCHIHA_CHAKRA_PALETTES.itachi;
+  const isSusanooFocusActive = susanooEnabled && timerMode === 'focus';
+  const activeChakraGlow = isSusanooFocusActive
+    ? `rgba(${chakraPalette.rgb}, 0.58)`
+    : chakraPalette.glow;
+
+  useEffect(() => {
+    const rootStyle = document.documentElement.style;
+    rootStyle.setProperty('--chakra-primary', chakraPalette.primary);
+    rootStyle.setProperty('--chakra-color', chakraPalette.primary);
+    rootStyle.setProperty('--chakra-glow', activeChakraGlow);
+    rootStyle.setProperty('--chakra-rgb', chakraPalette.rgb);
+  }, [chakraPalette.primary, chakraPalette.rgb, activeChakraGlow]);
 
   const [susanooModalOpen, setSusanooModalOpen] = useState(false);
   const [izanagiAbandonOpen, setIzanagiAbandonOpen] = useState(false);
@@ -128,17 +187,36 @@ export function TsukuyomiApp() {
         transition: { duration: 0.45, ease: DOLLY_EASE },
       };
 
+  const chakraStyle: ChakraCssVars = {
+    '--chakra-primary': chakraPalette.primary,
+    '--chakra-color': chakraPalette.primary,
+    '--chakra-glow': activeChakraGlow,
+    '--chakra-rgb': chakraPalette.rgb,
+  };
+
   return (
     <div
       data-tsukuyomi={isTsukuyomiMode ? 'true' : 'false'}
+      style={chakraStyle}
       className={cn(
-        'relative flex min-h-screen flex-col transition-colors duration-500',
+        'relative flex min-h-screen flex-col transition-colors duration-700',
         isTsukuyomiMode
           ? 'tsukuyomi-mode bg-[#000000] text-white'
           : 'bg-[#09090B] text-[#FAFAFA]',
       )}
     >
       <GenjutsuBackdrop />
+
+      {/* Reactive peripheral screen-edge chakra glow */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-[4] transition-all duration-700"
+        style={{
+          opacity: isSusanooFocusActive ? 0.95 : isTsukuyomiMode ? 0.72 : 0.48,
+          background: `radial-gradient(circle at 50% 48%, transparent 56%, rgba(${chakraPalette.rgb}, ${isSusanooFocusActive ? 0.18 : 0.1}) 88%, rgba(${chakraPalette.rgb}, ${isSusanooFocusActive ? 0.28 : 0.16}) 100%)`,
+          boxShadow: `inset 0 0 ${isSusanooFocusActive ? '130px' : '90px'} var(--chakra-glow), inset 0 0 ${isSusanooFocusActive ? '44px' : '24px'} rgba(${chakraPalette.rgb}, ${isSusanooFocusActive ? 0.26 : 0.14})`,
+        }}
+      />
 
       {visualBlurLevel > 0 ? (
         <div

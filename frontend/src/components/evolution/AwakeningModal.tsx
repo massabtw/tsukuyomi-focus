@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { SharinganSvg } from '@/components/clock/SharinganSvg';
 import { EYE_STAGE_MAP } from '@/constants/evolution';
 import { useTsukuyomiStore } from '@/store/useTsukuyomiStore';
+import { CinematicModalBackdropEffects } from '@/components/modals/SusanooBreakModal';
 
 export function AwakeningModal() {
   const prefersReducedMotion = useReducedMotion();
@@ -53,9 +54,12 @@ export function AwakeningModal() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.28 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/65 p-4 backdrop-blur-xl"
           onClick={dismissPendingAwakening}
         >
+          <CinematicModalBackdropEffects
+            prefersReducedMotion={prefersReducedMotion}
+          />
           <motion.div
             key={`awakening-dialog-${pendingAwakening}`}
             role="dialog"
@@ -82,7 +86,7 @@ export function AwakeningModal() {
                 : { type: 'spring', stiffness: 280, damping: 24 }
             }
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-red-900/60 border-t-red-500/30 bg-[#09090B] p-6 text-center shadow-[0_20px_50px_rgba(0,0,0,0.95)] sm:p-8"
+            className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-red-500/30 bg-[#09090B]/80 p-6 text-center shadow-[0_25px_70px_rgba(0,0,0,0.95),0_0_40px_rgba(220,38,38,0.2)] backdrop-blur-2xl sm:p-8"
           >
             {/* Subtle radial crimson flare behind eye */}
             <div
@@ -94,7 +98,7 @@ export function AwakeningModal() {
               type="button"
               onClick={dismissPendingAwakening}
               aria-label="Fechar modal de despertar ocular"
-              className="absolute right-4 top-4 rounded-lg border border-zinc-800 bg-zinc-900/80 p-1.5 text-zinc-400 transition-colors hover:border-red-800/70 hover:text-zinc-100"
+              className="absolute right-4 top-4 z-20 rounded-lg border border-zinc-800 bg-zinc-900/80 p-1.5 text-zinc-400 transition-colors hover:border-red-800/70 hover:text-zinc-100"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
