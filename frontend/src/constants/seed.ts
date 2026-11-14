@@ -1,9 +1,6 @@
 import { RANK_DEFINITIONS } from '@/constants/ranks';
 import { addDays, formatLocalDate } from '@/lib/date';
-import {
-  calculateSessionChakra,
-  getHighestUnlockedEyeStage,
-} from '@/lib/gamification';
+import { calculateSessionChakra } from '@/lib/gamification';
 import type {
   FocusSessionLog,
   Mission,
@@ -172,7 +169,6 @@ export function createInitialSeedState(
     0,
   );
   const longestStreak = 4;
-  const highestEye = getHighestUnlockedEyeStage(totalSeedChakra, longestStreak);
   const activeMission = missions.find((m) => m.status === 'in_tsukuyomi') ?? null;
   const initialDurationSeconds =
     (activeMission
@@ -183,9 +179,11 @@ export function createInitialSeedState(
     hasHydrated: false,
     activeTab: 'temple',
     chakra: totalSeedChakra,
-    currentEyeStage: highestEye,
-    equippedEyeStage: highestEye,
+    currentEyeStage: 'rinnegan',
+    equippedEyeStage: 'mangekyou',
     mangekyouVariant: 'itachi',
+    isBetaFullAccess: true,
+    susanooStageOverride: 'auto',
     streak: 4,
     longestStreak,
     lastFocusDate: yesterday,
@@ -226,5 +224,7 @@ export function createInitialSeedState(
     pendingAmaterasuPenalty: null,
     pendingIzanagiRescue: null,
     izanagiFlashNonce: 0,
+    tsukuyomiCastNonce: 0,
+    ocularSpinBurstNonce: 0,
   };
 }

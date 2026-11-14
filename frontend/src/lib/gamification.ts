@@ -55,7 +55,11 @@ export function isEyeStageUnlocked(
   stage: EyeStage,
   chakra: number,
   longestStreak: number,
+  isBetaFullAccess = true,
 ): boolean {
+  if (isBetaFullAccess) {
+    return true;
+  }
   const def = EYE_STAGE_MAP[stage];
   if (chakra >= def.requiredChakra) {
     return true;
@@ -72,10 +76,11 @@ export function isEyeStageUnlocked(
 export function getHighestUnlockedEyeStage(
   chakra: number,
   longestStreak: number,
+  isBetaFullAccess = false,
 ): EyeStage {
   let highest: EyeStage = 'normal';
   for (const def of EYE_STAGES) {
-    if (isEyeStageUnlocked(def.stage, chakra, longestStreak)) {
+    if (isEyeStageUnlocked(def.stage, chakra, longestStreak, isBetaFullAccess)) {
       highest = def.stage;
     }
   }
@@ -94,6 +99,7 @@ export function getNextEyeStageInfo(
   currentStage: EyeStage,
   chakra: number,
   longestStreak: number,
+  isBetaFullAccess = false,
 ): NextEyeStageInfo {
   const currentDefinition = EYE_STAGE_MAP[currentStage];
   const nextDefinition =
@@ -110,7 +116,14 @@ export function getNextEyeStageInfo(
     };
   }
 
-  if (isEyeStageUnlocked(nextDefinition.stage, chakra, longestStreak)) {
+  if (
+    isEyeStageUnlocked(
+      nextDefinition.stage,
+      chakra,
+      longestStreak,
+      isBetaFullAccess,
+    )
+  ) {
     return {
       currentDefinition,
       nextDefinition,

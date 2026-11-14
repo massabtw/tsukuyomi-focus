@@ -28,6 +28,8 @@ export type VisualBlurLevel = 0 | 1 | 2 | 3;
 
 export type IzanagiTriggerContext = 'abandon_cycle' | 'streak_rescue';
 
+export type SusanooStageOverride = 'auto' | 1 | 2 | 3;
+
 export interface TimerState {
   status: TimerStatus;
   mode: TimerMode;
@@ -172,6 +174,8 @@ export interface TsukuyomiState {
   currentEyeStage: EyeStage;
   equippedEyeStage: EyeStage;
   mangekyouVariant: MangekyouVariant;
+  isBetaFullAccess: boolean;
+  susanooStageOverride: SusanooStageOverride;
   streak: number;
   longestStreak: number;
   lastFocusDate: string | null;
@@ -188,6 +192,8 @@ export interface TsukuyomiState {
   pendingAmaterasuPenalty: AmaterasuPenalty | null;
   pendingIzanagiRescue: PendingIzanagiRescue | null;
   izanagiFlashNonce: number;
+  tsukuyomiCastNonce: number;
+  ocularSpinBurstNonce: number;
 }
 
 export interface TsukuyomiActions {
@@ -198,6 +204,7 @@ export interface TsukuyomiActions {
   setTimerMode: (mode: TimerMode, customDurationSeconds?: number) => void;
   setTimerDuration: (minutes: number) => void;
   setSusanooEnabled: (enabled: boolean) => void;
+  setSusanooStageOverride: (override: SusanooStageOverride) => void;
   startTimer: () => void;
   pauseTimer: () => void;
   resetTimer: () => void;
@@ -233,6 +240,9 @@ export interface TsukuyomiActions {
 
   equipEyeStage: (stage: EyeStage) => void;
   setMangekyouVariant: (variant: MangekyouVariant) => void;
+  setBetaFullAccess: (enabled: boolean) => void;
+  triggerOcularSpinBurst: () => void;
+  triggerTsukuyomiCastCutscene: () => void;
   dismissPendingAwakening: () => void;
   updateCustomEye: (patch: Partial<CustomEyeConfig>) => void;
 

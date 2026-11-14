@@ -36,6 +36,7 @@ import type {
   MangekyouVariant,
   Mission,
   MissionStatus,
+  SusanooStageOverride,
   TimerMode,
   TsukuyomiState,
   TsukuyomiStore,
@@ -62,7 +63,7 @@ function getDefaultDurationSecondsForMode(
 }
 
 const PERSIST_STORAGE_KEY = 'tsukuyomi-focus-storage';
-const PERSIST_VERSION = 1;
+const PERSIST_VERSION = 2;
 
 export const useTsukuyomiStore = create<TsukuyomiStore>()(
   persist(
@@ -78,65 +79,97 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
       },
 
       toggleTsukuyomiMode: (force?: boolean) => {
-        set((state) => ({
-          isTsukuyomiMode:
-            typeof force === 'boolean' ? force : !state.isTsukuyomiMode,
-        }));
+        const state = get();
+        const nextMode =
+          typeof force === 'boolean' ? force : !state.isTsukuyomiMode;
+
+        if (nextMode && !state.isTsukuyomiMode) {
+          void audioEngine.play('tsukuyomi-cast');
+          set({
+            isTsukuyomiMode: true,
+            tsukuyomiCastNonce: state.tsukuyomiCastNonce + 1,
+            ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
+          });
+          return;
+        }
+
+        if (!nextMode && state.isTsukuyomiMode) {
+          audioEngine.playClick();
+        }
+        set({ isTsukuyomiMode: nextMode });
       },
 
       setTimerMode: (mode: TimerMode, customDurationSeconds?: number) => {
-        set((state) => {
-          if (state.timer.status !== 'idle') {
-            return state;
-          }
-          const activeMission = state.missions.find(
-            (m) => m.id === state.timer.activeMissionId,
-          );
-          const durationSeconds =
-            customDurationSeconds ??
-            getDefaultDurationSecondsForMode(mode, activeMission);
-          return {
-            timer: {
-              ...state.timer,
-              mode,
-              durationSeconds,
-              remainingSeconds: durationSeconds,
-              targetEndTime: null,
-              susanooEnabled: mode === 'focus' ? state.timer.susanooEnabled : false,
-            },
-          };
+        const state = get();
+        if (state.timer.status !== 'idle') {
+          return;
+        }
+        const activeMission = state.missions.find(
+          (m) => m.id === state.timer.activeMissionId,
+        );
+        const durationSeconds =
+          customDurationSeconds ??
+          getDefaultDurationSecondsForMode(mode, activeMission);
+        audioEngine.playClick();
+        set({
+          ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
+          timer: {
+            ...state.timer,
+            mode,
+            durationSeconds,
+            remainingSeconds: durationSeconds,
+            targetEndTime: null,
+            susanooEnabled: mode === 'focus' ? state.timer.susanooEnabled : false,
+          },
         });
       },
 
       setTimerDuration: (minutes: number) => {
+        const state = get();
+        if (state.timer.status !== 'idle') {
+          return;
+        }
         const safeSeconds = Math.max(60, Math.round(minutes * 60));
-        set((state) => {
-          if (state.timer.status !== 'idle') {
-            return state;
-          }
-          return {
-            timer: {
-              ...state.timer,
-              durationSeconds: safeSeconds,
-              remainingSeconds: safeSeconds,
-              targetEndTime: null,
-            },
-          };
+        audioEngine.playClick();
+        set({
+          ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
+          timer: {
+            ...state.timer,
+            durationSeconds: safeSeconds,
+            remainingSeconds: safeSeconds,
+            targetEndTime: null,
+          },
         });
       },
 
       setSusanooEnabled: (enabled: boolean) => {
-        set((state) => {
-          if (state.timer.status !== 'idle' || state.timer.mode !== 'focus') {
-            return state;
-          }
-          return {
-            timer: {
-              ...state.timer,
-              susanooEnabled: enabled,
-            },
-          };
+        const state = get();
+        if (state.timer.status !== 'idle' || state.timer.mode !== 'focus') {
+          return;
+        }
+        const enabling = enabled && !state.timer.susanooEnabled;
+        if (enabling) {
+          void audioEngine.play('susanoo-summon');
+        } else if (!enabled && state.timer.susanooEnabled) {
+          audioEngine.playClick();
+        }
+        set({
+          ocularSpinBurstNonce: enabling
+            ? state.ocularSpinBurstNonce + 1
+            : state.ocularSpinBurstNonce,
+          timer: {
+            ...state.timer,
+            susanooEnabled: enabled,
+          },
         });
+      },
+
+      setSusanooStageOverride: (override: SusanooStageOverride) => {
+        void audioEngine.play('susanoo-summon');
+        set((state) => ({
+          susanooStageOverride: override,
+          ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
+        }));
       },
 
       startTimer: () => {
@@ -148,13 +181,23 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             ? state.timer.remainingSeconds
             : state.timer.durationSeconds;
         const targetEndTime = Date.now() + remaining * 1000;
+        const isFreshFocusStart =
+          state.timer.status === 'idle' && state.timer.mode === 'focus';
 
         void audioEngine.unlock();
-        if (state.timer.status === 'idle' && state.timer.mode === 'focus') {
-          void audioEngine.playSharinganActivate();
+        if (isFreshFocusStart) {
+          void audioEngine.play('tsukuyomi-cast');
+        } else {
+          audioEngine.playClick();
         }
 
         set({
+          tsukuyomiCastNonce: isFreshFocusStart
+            ? state.tsukuyomiCastNonce + 1
+            : state.tsukuyomiCastNonce,
+          ocularSpinBurstNonce: isFreshFocusStart
+            ? state.ocularSpinBurstNonce + 1
+            : state.ocularSpinBurstNonce,
           timer: {
             ...state.timer,
             status: 'running',
@@ -229,7 +272,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
 
       completeActiveCycle: () => {
         const state = get();
-        void audioEngine.playTsukuyomiComplete();
+        void audioEngine.play('mission-complete');
 
         if (state.timer.mode !== 'focus') {
           const activeMission = state.missions.find(
@@ -315,6 +358,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         const highestUnlocked = getHighestUnlockedEyeStage(
           nextChakra,
           streakUpdate.longestStreak,
+          state.isBetaFullAccess,
         );
         const didUnlockNewEye =
           EYE_STAGE_MAP[highestUnlocked].order >
@@ -369,6 +413,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         if (options?.useIzanagi && canInvokeIzanagi(state.izanagi)) {
           const nextIzanagi = blindNextHealthyEye(state.izanagi);
           if (nextIzanagi) {
+            void audioEngine.play('izanagi-rewind');
             set({
               izanagi: nextIzanagi,
               izanagiFlashNonce: state.izanagiFlashNonce + 1,
@@ -550,6 +595,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         }
 
         if (target.isAmaterasu) {
+          audioEngine.playClick();
           set({
             missions: state.missions.map((m) =>
               m.id === id ? { ...m, isAmaterasu: false, amaterasuDate: null } : m,
@@ -575,6 +621,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           };
         }
 
+        void audioEngine.play('amaterasu-ignite');
         set({
           missions: state.missions.map((m) =>
             m.id === id ? { ...m, isAmaterasu: true, amaterasuDate: today } : m,
@@ -584,6 +631,11 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
       },
 
       dragMissionToTsukuyomi: (id: string) => {
+        const current = get();
+        const targetMission = current.missions.find((m) => m.id === id);
+        if (!targetMission) return;
+
+        void audioEngine.play('sharingan-activate');
         set((state) => {
           const mission = state.missions.find((m) => m.id === id);
           if (!mission) return state;
@@ -600,6 +652,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
 
           return {
             activeTab: 'temple',
+            ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
             missions: nextMissions,
             timer: isIdle
               ? {
@@ -619,6 +672,11 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
       },
 
       setActiveMission: (id: string | null) => {
+        if (id) {
+          void audioEngine.play('sharingan-activate');
+        } else {
+          audioEngine.playClick();
+        }
         set((state) => {
           const mission = id
             ? state.missions.find((m) => m.id === id)
@@ -630,6 +688,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             : state.timer.durationSeconds;
 
           return {
+            ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
             timer: {
               ...state.timer,
               activeMissionId: id,
@@ -721,6 +780,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           return false;
         }
 
+        void audioEngine.play('izanagi-rewind');
         set({
           izanagi: nextIzanagi,
           lastFocusDate: getYesterdayLocalDate(formatLocalDate()),
@@ -749,14 +809,60 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
 
       equipEyeStage: (stage: EyeStage) => {
         const state = get();
-        if (!isEyeStageUnlocked(stage, state.chakra, state.longestStreak)) {
+        if (
+          !isEyeStageUnlocked(
+            stage,
+            state.chakra,
+            state.longestStreak,
+            state.isBetaFullAccess,
+          )
+        ) {
           return;
         }
-        set({ equippedEyeStage: stage });
+        void audioEngine.play('mangekyou-awaken');
+        set({
+          equippedEyeStage: stage,
+          ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
+        });
       },
 
       setMangekyouVariant: (variant: MangekyouVariant) => {
-        set({ mangekyouVariant: variant });
+        const state = get();
+        if (
+          !state.isBetaFullAccess &&
+          !isEyeStageUnlocked(
+            'mangekyou',
+            state.chakra,
+            state.longestStreak,
+            false,
+          )
+        ) {
+          return;
+        }
+        void audioEngine.play('mangekyou-awaken');
+        set({
+          mangekyouVariant: variant,
+          ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
+        });
+      },
+
+      setBetaFullAccess: (enabled: boolean) => {
+        audioEngine.playClick();
+        set({ isBetaFullAccess: enabled });
+      },
+
+      triggerOcularSpinBurst: () => {
+        set((state) => ({
+          ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
+        }));
+      },
+
+      triggerTsukuyomiCastCutscene: () => {
+        void audioEngine.play('tsukuyomi-cast');
+        set((state) => ({
+          tsukuyomiCastNonce: state.tsukuyomiCastNonce + 1,
+          ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
+        }));
       },
 
       dismissPendingAwakening: () => {
@@ -789,6 +895,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           const highestUnlocked = getHighestUnlockedEyeStage(
             nextChakra,
             state.longestStreak,
+            state.isBetaFullAccess,
           );
           const didUnlockNewEye =
             EYE_STAGE_MAP[highestUnlocked].order >
@@ -897,12 +1004,22 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
       name: PERSIST_STORAGE_KEY,
       version: PERSIST_VERSION,
       storage: createJSONStorage(() => localStorage),
-      partialize: (state): Omit<TsukuyomiState, 'hasHydrated' | 'izanagiFlashNonce'> => ({
+      partialize: (
+        state,
+      ): Omit<
+        TsukuyomiState,
+        | 'hasHydrated'
+        | 'izanagiFlashNonce'
+        | 'tsukuyomiCastNonce'
+        | 'ocularSpinBurstNonce'
+      > => ({
         activeTab: state.activeTab,
         chakra: state.chakra,
         currentEyeStage: state.currentEyeStage,
         equippedEyeStage: state.equippedEyeStage,
         mangekyouVariant: state.mangekyouVariant,
+        isBetaFullAccess: state.isBetaFullAccess,
+        susanooStageOverride: state.susanooStageOverride,
         streak: state.streak,
         longestStreak: state.longestStreak,
         lastFocusDate: state.lastFocusDate,
@@ -929,6 +1046,9 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           return {
             ...base,
             ...incoming,
+            isBetaFullAccess: true,
+            susanooStageOverride: 'auto' as const,
+            currentEyeStage: 'rinnegan' as const,
             izanagi: { ...base.izanagi, ...(incoming.izanagi ?? {}) },
             customEye: { ...base.customEye, ...(incoming.customEye ?? {}) },
             audio: { ...base.audio, ...(incoming.audio ?? {}) },
@@ -982,6 +1102,18 @@ export const useTimerCore = () =>
     })),
   );
 
+export const useSusanooStageOverride = () =>
+  useTsukuyomiStore((state) => state.susanooStageOverride);
+
+export const useIsBetaFullAccess = () =>
+  useTsukuyomiStore((state) => state.isBetaFullAccess);
+
+export const useTsukuyomiCastNonce = () =>
+  useTsukuyomiStore((state) => state.tsukuyomiCastNonce);
+
+export const useOcularSpinBurstNonce = () =>
+  useTsukuyomiStore((state) => state.ocularSpinBurstNonce);
+
 export const useOcularProfile = () =>
   useTsukuyomiStore(
     useShallow((state) => ({
@@ -994,6 +1126,8 @@ export const useOcularProfile = () =>
       longestStreak: state.longestStreak,
       visualBlurLevel: state.visualBlurLevel,
       izanagi: state.izanagi,
+      susanooStageOverride: state.susanooStageOverride,
+      isBetaFullAccess: state.isBetaFullAccess,
     })),
   );
 
