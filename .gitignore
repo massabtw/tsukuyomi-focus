@@ -10,3 +10,11 @@ out/
 appsettings.Development.json
 *.db
 *.log
+
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/next-env.d.ts
+frontend/*.tsbuildinfo
