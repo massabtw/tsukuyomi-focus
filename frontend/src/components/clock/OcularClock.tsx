@@ -2,7 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { motion, useAnimate, useReducedMotion } from 'framer-motion';
+import {
+  AnimatePresence,
+  motion,
+  useAnimate,
+  useReducedMotion,
+} from 'framer-motion';
 import { Flame, Shield } from 'lucide-react';
 import { SharinganSvg } from '@/components/clock/SharinganSvg';
 import { SusanooAura } from '@/components/clock/SusanooAura';
@@ -14,13 +19,22 @@ import { formatTimerClock } from '@/lib/date';
 import {
   useIsTsukuyomiMode,
   useOcularProfile,
+  useOcularSpinBurstNonce,
   useTimerCore,
   useTimerRemaining,
+  useTsukuyomiCastNonce,
   useTsukuyomiStore,
 } from '@/store/useTsukuyomiStore';
 
 const RING_RADIUS = 146;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const BURST_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+const DIGIT_FLIP_SPRING = {
+  type: 'spring',
+  stiffness: 360,
+  damping: 28,
+  mass: 0.6,
+} as const;
 
 const MODE_LABELS = {
   focus: 'Tsukuyomi',
@@ -28,13 +42,23 @@ const MODE_LABELS = {
   long_break: 'Repouso Longo',
 } as const;
 
+let lastConsumedCastNonce = 0;
+let lastConsumedSpinNonce = 0;
+
 export function OcularClock() {
   const prefersReducedMotion = useReducedMotion();
   const remainingSeconds = useTimerRemaining();
   const { status, mode, durationSeconds, activeMissionId, susanooEnabled } =
     useTimerCore();
-  const { equippedEyeStage, mangekyouVariant, customEye } = useOcularProfile();
+  const {
+    equippedEyeStage,
+    mangekyouVariant,
+    customEye,
+    susanooStageOverride,
+  } = useOcularProfile();
   const isTsukuyomiMode = useIsTsukuyomiMode();
+  const tsukuyomiCastNonce = useTsukuyomiCastNonce();
+  const ocularSpinBurstNonce = useOcularSpinBurstNonce();
   const activeMission = useTsukuyomiStore(
     (state) =>
       state.missions.find((m) => m.id === activeMissionId) ?? null,
@@ -43,7 +67,16 @@ export function OcularClock() {
   const parallax = useAwwwardsParallax(1);
 
   const [awakeningScope, animateAwakening] = useAnimate();
-  const prevStatusRef = useRef(status);
+  const [spinBurstScope, animateSpinBurst] = useAnimate();
+  const [shockwaveScope, animateShockwave] = useAnimate();
+  const spinAngleRef = useRef(0);
+  const prevTriggerRef = useRef({
+    initialized: false,
+    status,
+    equippedEyeStage,
+    mangekyouVariant,
+    susanooStageOverride,
+  });
 
   const isRunning = status === 'running';
   const isPaused = status === 'paused';
@@ -59,26 +92,95 @@ export function OcularClock() {
   const isAwakening = isRunning && elapsedSeconds <= 3;
 
   useEffect(() => {
-    const wasRunning = prevStatusRef.current === 'running';
-    prevStatusRef.current = status;
+    const prev = prevTriggerRef.current;
+    const castTriggered = tsukuyomiCastNonce > lastConsumedCastNonce;
+    const spinNonceTriggered = ocularSpinBurstNonce > lastConsumedSpinNonce;
 
-    if (!wasRunning && status === 'running' && !prefersReducedMotion) {
-      void (async () => {
-        if (!awakeningScope.current) return;
-        await animateAwakening(
-          awakeningScope.current,
-          { scale: 1.08 },
-          { type: 'spring', stiffness: 320, damping: 16 },
-        );
-        if (!awakeningScope.current) return;
-        await animateAwakening(
-          awakeningScope.current,
-          { scale: 1 },
-          { type: 'spring', stiffness: 220, damping: 22 },
-        );
-      })();
+    const propChanged =
+      prev.initialized &&
+      (prev.equippedEyeStage !== equippedEyeStage ||
+        prev.mangekyouVariant !== mangekyouVariant ||
+        prev.susanooStageOverride !== susanooStageOverride);
+    const startedRunning =
+      prev.initialized && prev.status !== 'running' && status === 'running';
+
+    lastConsumedCastNonce = tsukuyomiCastNonce;
+    lastConsumedSpinNonce = ocularSpinBurstNonce;
+    prevTriggerRef.current = {
+      initialized: true,
+      status,
+      equippedEyeStage,
+      mangekyouVariant,
+      susanooStageOverride,
+    };
+
+    const shouldBurst =
+      castTriggered || spinNonceTriggered || propChanged || startedRunning;
+
+    if (!shouldBurst || prefersReducedMotion) {
+      return;
     }
-  }, [status, prefersReducedMotion, animateAwakening, awakeningScope]);
+
+    const isCast = castTriggered;
+    spinAngleRef.current += isCast ? 720 : 360;
+
+    if (spinBurstScope.current) {
+      void animateSpinBurst(
+        spinBurstScope.current,
+        { rotate: spinAngleRef.current },
+        {
+          type: 'tween',
+          duration: isCast ? 0.95 : 0.72,
+          ease: BURST_EASE,
+        },
+      );
+    }
+
+    if (shockwaveScope.current) {
+      void animateShockwave(
+        shockwaveScope.current,
+        {
+          scale: isCast ? [0.7, 1.18, 1.52] : [0.76, 1.12, 1.4],
+          opacity: [0, 0.92, 0],
+        },
+        {
+          type: 'tween',
+          duration: isCast ? 0.95 : 0.68,
+          times: [0, 0.3, 1],
+          ease: BURST_EASE,
+        },
+      );
+    }
+
+    void (async () => {
+      if (!awakeningScope.current) return;
+      await animateAwakening(
+        awakeningScope.current,
+        { scale: isCast ? 1.15 : 1.09 },
+        { type: 'spring', stiffness: 340, damping: 16 },
+      );
+      if (!awakeningScope.current) return;
+      await animateAwakening(
+        awakeningScope.current,
+        { scale: 1 },
+        { type: 'spring', stiffness: 220, damping: 22 },
+      );
+    })();
+  }, [
+    tsukuyomiCastNonce,
+    ocularSpinBurstNonce,
+    equippedEyeStage,
+    mangekyouVariant,
+    susanooStageOverride,
+    status,
+    prefersReducedMotion,
+    animateAwakening,
+    animateSpinBurst,
+    animateShockwave,
+    awakeningScope,
+    spinBurstScope,
+    shockwaveScope,
+  ]);
 
   const useCustomImage = Boolean(customEye.enabled && customEye.imageDataUrl);
   const effectiveGlow = useCustomImage
@@ -96,7 +198,10 @@ export function OcularClock() {
 
   const stageInfo = EYE_STAGE_MAP[equippedEyeStage];
   const rankDef = activeMission ? RANK_DEFINITIONS[activeMission.rank] : null;
-  const susanooActive = susanooEnabled && isFocus;
+  const susanooActive =
+    (susanooEnabled && isFocus) || susanooStageOverride !== 'auto';
+  const formattedClock = formatTimerClock(remainingSeconds);
+  const clockCharacters = formattedClock.split('');
 
   return (
     <div
@@ -106,6 +211,17 @@ export function OcularClock() {
     >
       {/* Interactive 4-Layer Stage */}
       <div className="relative flex h-[320px] w-[320px] items-center justify-center sm:h-[370px] sm:w-[370px]">
+        {/* Expanding Crimson Shockwave Ring around OcularClock */}
+        <div
+          ref={shockwaveScope}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-2 z-20 rounded-full border-2 border-red-500/85 opacity-0 will-change-transform"
+          style={{
+            boxShadow:
+              '0 0 28px rgba(220, 38, 38, 0.75), inset 0 0 18px rgba(239, 68, 68, 0.45)',
+          }}
+        />
+
         {/* Plano -2: Abyss & Controlled Crimson Radial Halo */}
         <motion.div
           style={{ x: parallax.layerBg.x, y: parallax.layerBg.y }}
@@ -132,6 +248,8 @@ export function OcularClock() {
             progress={progressPercent}
             enabled={susanooActive}
             isRunning={isRunning}
+            variant={mangekyouVariant}
+            stageOverride={susanooStageOverride}
             className="h-full w-full"
           />
         </motion.div>
@@ -213,79 +331,86 @@ export function OcularClock() {
             style={{ x: parallax.layerFg.x, y: parallax.layerFg.y }}
             className="absolute z-20 flex h-[216px] w-[216px] items-center justify-center will-change-transform sm:h-[250px] sm:w-[250px]"
           >
-            {/* 2-state Spring Awakening Pulse Wrapper */}
+            {/* 2-state Spring Awakening & Pupil Dilation Wrapper */}
             <div
               ref={awakeningScope}
               className="h-full w-full will-change-transform"
             >
-              {/* Cyclic Breathing Tween Wrapper ([1, 1.025, 1] strictly tween) */}
-              <motion.div
+              {/* Centrifugal Spin Burst Wrapper (imperative +360 / +720 burst) */}
+              <div
+                ref={spinBurstScope}
                 className="h-full w-full will-change-transform"
-                animate={
-                  prefersReducedMotion
-                    ? { scale: 1 }
-                    : { scale: [1, 1.025, 1] }
-                }
-                transition={
-                  prefersReducedMotion
-                    ? { duration: 0.2 }
-                    : {
-                        type: 'tween',
-                        ease: 'easeInOut',
-                        duration: isUrgent ? 1.5 : 3.8,
-                        repeat: Infinity,
-                      }
-                }
               >
-                {/* Continuous 60fps Rotation Tween Wrapper */}
+                {/* Cyclic Breathing Tween Wrapper ([1, 1.025, 1] strictly tween) */}
                 <motion.div
-                  className="h-full w-full rounded-full will-change-transform"
-                  style={{ filter: `drop-shadow(${eyeDropShadow})` }}
+                  className="h-full w-full will-change-transform"
                   animate={
-                    prefersReducedMotion || isPaused
-                      ? { rotate: 0 }
-                      : { rotate: 360 }
+                    prefersReducedMotion
+                      ? { scale: 1 }
+                      : { scale: [1, 1.025, 1] }
                   }
                   transition={
-                    prefersReducedMotion || isPaused
-                      ? { duration: 0.3 }
+                    prefersReducedMotion
+                      ? { duration: 0.2 }
                       : {
                           type: 'tween',
-                          ease: 'linear',
-                          duration: isUrgent ? 6 : 30,
+                          ease: 'easeInOut',
+                          duration: isUrgent ? 1.5 : 3.8,
                           repeat: Infinity,
                         }
                   }
                 >
-                  {useCustomImage && customEye.imageDataUrl ? (
-                    <div className="relative h-full w-full overflow-hidden rounded-full border-4 border-[#09090B] bg-black">
-                      <Image
-                        src={customEye.imageDataUrl}
-                        alt="Sharingan customizado"
-                        fill
-                        unoptimized
-                        className="object-cover"
-                        style={{
-                          transform: `scale(${customEye.scale})`,
-                        }}
+                  {/* Continuous 60fps Rotation Tween Wrapper */}
+                  <motion.div
+                    className="h-full w-full rounded-full will-change-transform"
+                    style={{ filter: `drop-shadow(${eyeDropShadow})` }}
+                    animate={
+                      prefersReducedMotion || isPaused
+                        ? { rotate: 0 }
+                        : { rotate: 360 }
+                    }
+                    transition={
+                      prefersReducedMotion || isPaused
+                        ? { duration: 0.3 }
+                        : {
+                            type: 'tween',
+                            ease: 'linear',
+                            duration: isUrgent ? 6 : 30,
+                            repeat: Infinity,
+                          }
+                    }
+                  >
+                    {useCustomImage && customEye.imageDataUrl ? (
+                      <div className="relative h-full w-full overflow-hidden rounded-full border-4 border-[#09090B] bg-black">
+                        <Image
+                          src={customEye.imageDataUrl}
+                          alt="Sharingan customizado"
+                          fill
+                          unoptimized
+                          className="object-cover"
+                          style={{
+                            transform: `scale(${customEye.scale})`,
+                          }}
+                        />
+                        <div
+                          className="pointer-events-none absolute inset-0 rounded-full"
+                          style={{
+                            boxShadow: 'inset 0 0 24px #000000',
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <SharinganSvg
+                        stage={equippedEyeStage}
+                        variant={mangekyouVariant}
+                        isAwakening={isAwakening}
+                        isUrgent={isUrgent}
+                        isSpinBurst={isAwakening}
                       />
-                      <div
-                        className="pointer-events-none absolute inset-0 rounded-full"
-                        style={{
-                          boxShadow: 'inset 0 0 24px #000000',
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <SharinganSvg
-                      stage={equippedEyeStage}
-                      variant={mangekyouVariant}
-                      isAwakening={isAwakening}
-                      isUrgent={isUrgent}
-                    />
-                  )}
+                    )}
+                  </motion.div>
                 </motion.div>
-              </motion.div>
+              </div>
             </div>
           </motion.div>
         </motion.div>
@@ -309,6 +434,9 @@ export function OcularClock() {
             <span className="inline-flex items-center gap-1 rounded border border-red-500/35 bg-red-950/40 px-1.5 py-0.5 text-[10px] tracking-wider text-red-400">
               <Shield className="h-3 w-3" aria-hidden="true" />
               Susano&apos;o
+              {susanooStageOverride !== 'auto'
+                ? ` · F${susanooStageOverride}`
+                : ''}
             </span>
           )}
         </div>
@@ -316,19 +444,52 @@ export function OcularClock() {
         <time
           dateTime={`PT${remainingSeconds}S`}
           aria-live="off"
+          aria-label={formattedClock}
           className={cn(
-            'font-mono text-5xl font-semibold tracking-tight tabular-nums transition-colors sm:text-6xl',
+            'inline-flex items-center justify-center font-mono text-5xl font-semibold tracking-tight tabular-nums transition-colors sm:text-6xl',
             isUrgent
               ? 'text-red-400 drop-shadow-[0_0_16px_rgba(239,68,68,0.55)]'
               : 'text-zinc-50',
           )}
         >
-          {formatTimerClock(remainingSeconds)}
+          {clockCharacters.map((char, idx) => (
+            <span
+              key={idx}
+              style={{ perspective: 450 }}
+              className={cn(
+                'relative -my-1 inline-flex items-center justify-center overflow-hidden py-1',
+                char === ':' ? 'w-[0.38em]' : 'w-[0.64em]',
+              )}
+            >
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={char}
+                  initial={
+                    prefersReducedMotion
+                      ? false
+                      : { y: 18, rotateX: 45, opacity: 0, filter: 'blur(4px)' }
+                  }
+                  animate={{ y: 0, rotateX: 0, opacity: 1, filter: 'blur(0px)' }}
+                  exit={
+                    prefersReducedMotion
+                      ? { opacity: 0 }
+                      : { y: -18, rotateX: -45, opacity: 0, filter: 'blur(4px)' }
+                  }
+                  transition={
+                    prefersReducedMotion ? { duration: 0 } : DIGIT_FLIP_SPRING
+                  }
+                  className="inline-block will-change-transform"
+                >
+                  {char}
+                </motion.span>
+              </AnimatePresence>
+            </span>
+          ))}
         </time>
 
         <p className="mt-1 text-xs text-zinc-400">
           {stageInfo.name}
-          {equippedEyeStage === 'mangekyou' &&
+          {(equippedEyeStage === 'mangekyou' || equippedEyeStage === 'ems') &&
             ` · ${MANGEKYOU_VARIANT_MAP[mangekyouVariant].wielder}`}
         </p>
 

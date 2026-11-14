@@ -4,6 +4,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Flame, ScrollText, Sparkles, X } from 'lucide-react';
 import { RANK_DEFINITIONS, RANK_ORDER } from '@/constants/ranks';
+import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import { formatLocalDate } from '@/lib/date';
 import { calculateSessionChakra } from '@/lib/gamification';
@@ -24,12 +25,19 @@ const COLUMN_STATUS_LABELS: Record<MissionStatus, string> = {
 
 const QUICK_MINUTE_OPTIONS = [15, 25, 35, 50, 75, 90] as const;
 
+const PILL_SPRING = {
+  type: 'spring',
+  stiffness: 360,
+  damping: 24,
+} as const;
+
 interface NewMissionFormProps {
   defaultStatus: MissionStatus;
   onClose: () => void;
 }
 
 function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
+  const prefersReducedMotion = Boolean(useReducedMotion());
   const titleId = useId();
   const descId = useId();
   const minutesId = useId();
@@ -60,7 +68,10 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
     !activeAmaterasuToday && status !== 'completed';
   const effectiveAmaterasu = canActivateAmaterasu && isAmaterasu;
 
-  const safeMinutes = Math.max(5, Math.min(240, Math.round(estimatedMinutes || 25)));
+  const safeMinutes = Math.max(
+    5,
+    Math.min(240, Math.round(estimatedMinutes || 25)),
+  );
   const previewChakra = calculateSessionChakra({
     durationMinutes: safeMinutes,
     rank,
@@ -75,6 +86,7 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
   });
 
   function handleRankChange(nextRank: MissionRank) {
+    audioEngine.playClick();
     setRank(nextRank);
     setEstimatedMinutes(RANK_DEFINITIONS[nextRank].suggestedMinutes);
   }
@@ -83,8 +95,17 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
     event.preventDefault();
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      setErrorMessage('Inscreva o título da missão antes de selar o pergaminho.');
+      audioEngine.playClick();
+      setErrorMessage(
+        'Inscreva o título da missão antes de selar o pergaminho.',
+      );
       return;
+    }
+
+    if (effectiveAmaterasu) {
+      void audioEngine.play('amaterasu-ignite');
+    } else {
+      audioEngine.playClick();
     }
 
     addMission({
@@ -174,11 +195,17 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
             const def = RANK_DEFINITIONS[rankKey];
             const selected = rank === rankKey;
             return (
-              <button
+              <motion.button
                 key={rankKey}
                 type="button"
                 role="radio"
                 aria-checked={selected}
+                whileHover={
+                  prefersReducedMotion ? undefined : { y: -2, scale: 1.02 }
+                }
+                whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+                transition={PILL_SPRING}
+                onMouseEnter={() => audioEngine.playHover()}
                 onClick={() => handleRankChange(rankKey)}
                 className={cn(
                   'group relative flex flex-col items-center justify-center rounded-lg border px-2 py-2.5 text-center transition-colors',
@@ -207,7 +234,7 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
                 <span className="font-mono text-[10px] tabular-nums text-[#52525B]">
                   {def.suggestedMinutes}m
                 </span>
-              </button>
+              </motion.button>
             );
           })}
         </div>
@@ -245,7 +272,11 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
                 <button
                   key={mins}
                   type="button"
-                  onClick={() => setEstimatedMinutes(mins)}
+                  onMouseEnter={() => audioEngine.playHover()}
+                  onClick={() => {
+                    audioEngine.playClick();
+                    setEstimatedMinutes(mins);
+                  }}
                   className={cn(
                     'rounded border px-1.5 py-1 font-mono text-[11px] tabular-nums transition-colors',
                     estimatedMinutes === mins
@@ -267,7 +298,11 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
           <select
             aria-label="Coluna inicial da missão"
             value={status}
-            onChange={(e) => setStatus(e.target.value as MissionStatus)}
+            onMouseEnter={() => audioEngine.playHover()}
+            onChange={(e) => {
+              audioEngine.playClick();
+              setStatus(e.target.value as MissionStatus);
+            }}
             className="w-full rounded-lg border border-[#27272A] bg-[#09090B] px-3 py-2 text-sm text-[#FAFAFA] focus:border-[#DC2626] focus:outline-none"
           >
             {(['todo', 'in_tsukuyomi', 'completed'] as const).map((col) => (
@@ -281,6 +316,11 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
 
       {/* Amaterasu Daily Seal */}
       <div
+        onMouseEnter={() => {
+          if (canActivateAmaterasu) {
+            audioEngine.playHover();
+          }
+        }}
         className={cn(
           'rounded-xl border p-3.5 transition-colors',
           effectiveAmaterasu
@@ -292,7 +332,9 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
           htmlFor={amaterasuId}
           className={cn(
             'flex items-start gap-3',
-            canActivateAmaterasu ? 'cursor-pointer' : 'cursor-not-allowed opacity-70',
+            canActivateAmaterasu
+              ? 'cursor-pointer'
+              : 'cursor-not-allowed opacity-70',
           )}
         >
           <input
@@ -300,7 +342,11 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
             type="checkbox"
             checked={effectiveAmaterasu}
             disabled={!canActivateAmaterasu}
-            onChange={(e) => setIsAmaterasu(e.target.checked)}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              audioEngine.playClick();
+              setIsAmaterasu(checked);
+            }}
             className="mt-0.5 h-4 w-4 rounded border-[#7F1D1D] bg-[#000000] accent-[#DC2626]"
           />
           <div className="flex-1 space-y-1">
@@ -357,8 +403,8 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
               </span>
             </div>
             <div className="font-mono text-[11px] tabular-nums text-[#52525B]">
-              Com Susano&apos;o ativo: +{previewSusanooChakra.toLocaleString('pt-BR')}{' '}
-              Chakra
+              Com Susano&apos;o ativo: +
+              {previewSusanooChakra.toLocaleString('pt-BR')} Chakra
             </div>
           </div>
         </div>
@@ -366,18 +412,28 @@ function NewMissionForm({ defaultStatus, onClose }: NewMissionFormProps) {
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onMouseEnter={() => audioEngine.playHover()}
+            onClick={() => {
+              audioEngine.playClick();
+              onClose();
+            }}
             className="rounded-lg border border-[#27272A] bg-[#09090B] px-4 py-2 text-sm font-medium text-[#A1A1AA] transition-colors hover:border-[#3F3F46] hover:text-[#FAFAFA]"
           >
             Cancelar
           </button>
-          <button
+          <motion.button
             type="submit"
+            whileHover={
+              prefersReducedMotion ? undefined : { y: -1, scale: 1.02 }
+            }
+            whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+            transition={PILL_SPRING}
+            onMouseEnter={() => audioEngine.playHover()}
             className="inline-flex items-center gap-2 rounded-lg border border-[#DC2626]/70 bg-[#DC2626] px-4 py-2 text-sm font-semibold text-[#FAFAFA] shadow-[0_0_20px_rgba(220,38,38,0.35)] transition-colors hover:bg-[#EF4444]"
           >
             <ScrollText className="h-4 w-4" />
             Selar Missão
-          </button>
+          </motion.button>
         </div>
       </div>
     </form>
@@ -396,6 +452,7 @@ export function NewMissionModal({
     if (!isOpen) return;
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        audioEngine.playClick();
         onClose();
       }
     }
@@ -412,7 +469,10 @@ export function NewMissionModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
-          onClick={onClose}
+          onClick={() => {
+            audioEngine.playClick();
+            onClose();
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
@@ -464,7 +524,11 @@ export function NewMissionModal({
 
               <button
                 type="button"
-                onClick={onClose}
+                onMouseEnter={() => audioEngine.playHover()}
+                onClick={() => {
+                  audioEngine.playClick();
+                  onClose();
+                }}
                 aria-label="Fechar modal de nova missão"
                 className="rounded-lg border border-[#27272A] bg-[#09090B]/80 p-1.5 text-[#A1A1AA] transition-colors hover:border-[#DC2626]/60 hover:text-[#FAFAFA]"
               >

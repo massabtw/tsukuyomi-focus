@@ -1,8 +1,14 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Image from 'next/image';
-import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from 'framer-motion';
 import { Check, Flame, Lock, ShieldCheck, Sparkles } from 'lucide-react';
 import { SharinganSvg } from '@/components/clock/SharinganSvg';
 import { CustomEyeUploader } from '@/components/evolution/CustomEyeUploader';
@@ -13,6 +19,7 @@ import {
   MANGEKYOU_VARIANTS,
 } from '@/constants/evolution';
 import { useAwwwardsParallax } from '@/hooks/useAwwwardsParallax';
+import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import {
   getNextEyeStageInfo,
@@ -22,9 +29,18 @@ import {
   useOcularProfile,
   useTsukuyomiStore,
 } from '@/store/useTsukuyomiStore';
+import type { EyeStage, MangekyouVariant } from '@/types/tsukuyomi';
+
+const MICRO_SPRING = {
+  type: 'spring',
+  stiffness: 340,
+  damping: 24,
+} as const;
+
+const FLASH_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 export function NakaShrineView() {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = Boolean(useReducedMotion());
   const shrineRef = useRef<HTMLDivElement | null>(null);
 
   const {
@@ -34,12 +50,22 @@ export function NakaShrineView() {
     mangekyouVariant,
     customEye,
     longestStreak,
+    isBetaFullAccess,
   } = useOcularProfile();
 
   const equipEyeStage = useTsukuyomiStore((state) => state.equipEyeStage);
   const setMangekyouVariant = useTsukuyomiStore(
     (state) => state.setMangekyouVariant,
   );
+
+  const [stageFlash, setStageFlash] = useState<{
+    stage: EyeStage;
+    nonce: number;
+  } | null>(null);
+  const [variantFlash, setVariantFlash] = useState<{
+    variant: MangekyouVariant;
+    nonce: number;
+  } | null>(null);
 
   // Camera-descent scroll parallax: background stone tablet descends slower/positively while foreground rises subtly
   const { scrollYProgress } = useScroll({
@@ -66,11 +92,36 @@ export function NakaShrineView() {
     longestStreak,
   );
   const equippedDef = EYE_STAGE_MAP[equippedEyeStage];
+  const isMangekyouLoreUnlocked = isEyeStageUnlocked(
+    'mangekyou',
+    chakra,
+    longestStreak,
+    false,
+  );
   const isMangekyouUnlocked = isEyeStageUnlocked(
     'mangekyou',
     chakra,
     longestStreak,
+    isBetaFullAccess,
   );
+
+  function handleSelectEyeStage(stage: EyeStage) {
+    setStageFlash((prev) => ({
+      stage,
+      nonce: (prev?.nonce ?? 0) + 1,
+    }));
+    // equipEyeStage plays audioEngine.play('mangekyou-awaken') in the store
+    equipEyeStage(stage);
+  }
+
+  function handleSelectMangekyouVariant(variant: MangekyouVariant) {
+    setVariantFlash((prev) => ({
+      variant,
+      nonce: (prev?.nonce ?? 0) + 1,
+    }));
+    // setMangekyouVariant plays audioEngine.play('mangekyou-awaken') in the store
+    setMangekyouVariant(variant);
+  }
 
   return (
     <div
@@ -200,25 +251,49 @@ export function NakaShrineView() {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-zinc-800/90 bg-[#09090B]/85 px-4 py-3">
+                <motion.div
+                  whileHover={
+                    prefersReducedMotion ? undefined : { y: -3, scale: 1.01 }
+                  }
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                  transition={MICRO_SPRING}
+                  onMouseEnter={() => audioEngine.playHover()}
+                  className="will-change-transform rounded-xl border border-zinc-800/90 bg-[#09090B]/85 px-4 py-3 transition-colors hover:border-red-900/60"
+                >
                   <span className="text-[11px] uppercase tracking-wider text-zinc-500">
                     Chakra Acumulado
                   </span>
                   <p className="mt-1 font-mono tabular-nums text-xl font-bold text-zinc-50">
                     {chakra.toLocaleString('pt-BR')}
                   </p>
-                </div>
+                </motion.div>
 
-                <div className="rounded-xl border border-zinc-800/90 bg-[#09090B]/85 px-4 py-3">
+                <motion.div
+                  whileHover={
+                    prefersReducedMotion ? undefined : { y: -3, scale: 1.01 }
+                  }
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                  transition={MICRO_SPRING}
+                  onMouseEnter={() => audioEngine.playHover()}
+                  className="will-change-transform rounded-xl border border-zinc-800/90 bg-[#09090B]/85 px-4 py-3 transition-colors hover:border-red-900/60"
+                >
                   <span className="text-[11px] uppercase tracking-wider text-zinc-500">
                     Estágio Máximo
                   </span>
                   <p className="mt-1 text-sm font-semibold text-red-400">
                     {EYE_STAGE_MAP[currentEyeStage].name}
                   </p>
-                </div>
+                </motion.div>
 
-                <div className="rounded-xl border border-zinc-800/90 bg-[#09090B]/85 px-4 py-3">
+                <motion.div
+                  whileHover={
+                    prefersReducedMotion ? undefined : { y: -3, scale: 1.01 }
+                  }
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                  transition={MICRO_SPRING}
+                  onMouseEnter={() => audioEngine.playHover()}
+                  className="will-change-transform rounded-xl border border-zinc-800/90 bg-[#09090B]/85 px-4 py-3 transition-colors hover:border-red-900/60"
+                >
                   <span className="text-[11px] uppercase tracking-wider text-zinc-500">
                     Recorde de Ofensiva
                   </span>
@@ -229,7 +304,7 @@ export function NakaShrineView() {
                     />
                     <span>{longestStreak}d</span>
                   </p>
-                </div>
+                </motion.div>
               </div>
 
               <div className="rounded-xl border border-zinc-800/80 bg-[#09090B]/75 p-4">
@@ -264,7 +339,10 @@ export function NakaShrineView() {
         </section>
 
         {/* 7-Stage Uchiha Stone Tablet */}
-        <section aria-labelledby="stone-tablet-stages-heading" className="space-y-4">
+        <section
+          aria-labelledby="stone-tablet-stages-heading"
+          className="space-y-4"
+        >
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2
@@ -293,22 +371,48 @@ export function NakaShrineView() {
             />
 
             {EYE_STAGES.map((def, idx) => {
+              const loreUnlocked = isEyeStageUnlocked(
+                def.stage,
+                chakra,
+                longestStreak,
+                false,
+              );
               const unlocked = isEyeStageUnlocked(
                 def.stage,
                 chakra,
                 longestStreak,
+                isBetaFullAccess,
               );
+              const unlockedViaBeta = unlocked && !loreUnlocked;
               const isEquipped = equippedEyeStage === def.stage;
               const unlockedViaStreak =
+                loreUnlocked &&
                 def.alternativeStreakRequirement !== undefined &&
                 longestStreak >= def.alternativeStreakRequirement &&
                 chakra < def.requiredChakra;
+              const isFlashing = stageFlash?.stage === def.stage;
 
               return (
-                <article
+                <motion.article
                   key={def.stage}
+                  whileHover={
+                    unlocked && !prefersReducedMotion
+                      ? { y: -3, scale: 1.01 }
+                      : undefined
+                  }
+                  whileTap={
+                    unlocked && !prefersReducedMotion
+                      ? { scale: 0.98 }
+                      : undefined
+                  }
+                  transition={MICRO_SPRING}
+                  onMouseEnter={() => {
+                    if (unlocked) {
+                      audioEngine.playHover();
+                    }
+                  }}
                   className={cn(
-                    'relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between sm:p-5',
+                    'will-change-transform relative flex flex-col gap-4 rounded-2xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between sm:p-5',
                     isEquipped
                       ? 'obsidian-surface-crimson border-red-600/70'
                       : unlocked
@@ -316,6 +420,26 @@ export function NakaShrineView() {
                         : 'border-zinc-900 bg-[#09090B]/70 opacity-75',
                   )}
                 >
+                  {/* Ocular flash ring animation on newly selected card */}
+                  <AnimatePresence>
+                    {isFlashing && !prefersReducedMotion && (
+                      <motion.span
+                        key={`stage-card-flash-${stageFlash.nonce}`}
+                        aria-hidden="true"
+                        initial={{ opacity: 0.9, scale: 0.99 }}
+                        animate={{ opacity: 0, scale: 1.02 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.6, ease: FLASH_EASE }}
+                        onAnimationComplete={() =>
+                          setStageFlash((curr) =>
+                            curr?.nonce === stageFlash.nonce ? null : curr,
+                          )
+                        }
+                        className="pointer-events-none absolute -inset-px rounded-2xl border-2 border-[#EF4444] shadow-[0_0_28px_rgba(220,38,38,0.55)] will-change-transform"
+                      />
+                    )}
+                  </AnimatePresence>
+
                   <div className="flex items-start gap-4 sm:items-center">
                     {/* Eye preview wrapper */}
                     <div
@@ -331,6 +455,20 @@ export function NakaShrineView() {
                         variant={mangekyouVariant}
                         className="h-full w-full"
                       />
+
+                      <AnimatePresence>
+                        {isFlashing && !prefersReducedMotion && (
+                          <motion.span
+                            key={`stage-eye-ring-${stageFlash.nonce}`}
+                            aria-hidden="true"
+                            initial={{ opacity: 0.95, scale: 0.85 }}
+                            animate={{ opacity: 0, scale: 1.48 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.65, ease: FLASH_EASE }}
+                            className="pointer-events-none absolute inset-0 rounded-full border-2 border-[#EF4444] shadow-[0_0_24px_rgba(239,68,68,0.8)] will-change-transform"
+                          />
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     <div className="space-y-1">
@@ -342,17 +480,37 @@ export function NakaShrineView() {
                           {def.name}
                         </h3>
                         {isEquipped ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-red-500/60 bg-red-950/60 px-2.5 py-0.5 text-[11px] font-medium text-red-200">
-                            <Check className="h-3 w-3" aria-hidden="true" />
-                            Equipado
-                          </span>
+                          <>
+                            <span className="inline-flex items-center gap-1 rounded-full border border-red-500/60 bg-red-950/60 px-2.5 py-0.5 text-[11px] font-medium text-red-200">
+                              <Check className="h-3 w-3" aria-hidden="true" />
+                              Equipado
+                            </span>
+                            {unlockedViaBeta && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-red-900/60 bg-red-950/35 px-2 py-0.5 text-[10px] font-medium text-red-300/90">
+                                Beta Liberado
+                              </span>
+                            )}
+                          </>
                         ) : unlocked ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-900 px-2.5 py-0.5 text-[11px] font-medium text-zinc-300">
-                            <ShieldCheck className="h-3 w-3 text-red-400" aria-hidden="true" />
-                            {unlockedViaStreak
-                              ? 'Despertado por Ofensiva'
-                              : 'Despertado'}
-                          </span>
+                          unlockedViaBeta ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-red-900/60 bg-red-950/35 px-2.5 py-0.5 text-[11px] font-medium text-red-300">
+                              <Sparkles
+                                className="h-3 w-3 text-red-400"
+                                aria-hidden="true"
+                              />
+                              Beta Liberado
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-900 px-2.5 py-0.5 text-[11px] font-medium text-zinc-300">
+                              <ShieldCheck
+                                className="h-3 w-3 text-red-400"
+                                aria-hidden="true"
+                              />
+                              {unlockedViaStreak
+                                ? 'Despertado por Ofensiva'
+                                : 'Despertado'}
+                            </span>
+                          )
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-0.5 text-[11px] font-medium text-zinc-500">
                             <Lock className="h-3 w-3" aria-hidden="true" />
@@ -383,12 +541,30 @@ export function NakaShrineView() {
                       </p>
                     </div>
 
-                    <button
+                    <motion.button
                       type="button"
-                      disabled={!unlocked || isEquipped}
-                      onClick={() => equipEyeStage(def.stage)}
+                      disabled={
+                        isBetaFullAccess ? isEquipped : !unlocked || isEquipped
+                      }
+                      whileHover={
+                        unlocked && !isEquipped && !prefersReducedMotion
+                          ? { y: -2, scale: 1.02 }
+                          : undefined
+                      }
+                      whileTap={
+                        unlocked && !isEquipped && !prefersReducedMotion
+                          ? { scale: 0.98 }
+                          : undefined
+                      }
+                      transition={MICRO_SPRING}
+                      onMouseEnter={() => {
+                        if (unlocked && !isEquipped) {
+                          audioEngine.playHover();
+                        }
+                      }}
+                      onClick={() => handleSelectEyeStage(def.stage)}
                       className={cn(
-                        'shrink-0 rounded-xl px-4 py-2 text-xs font-semibold transition-colors',
+                        'will-change-transform shrink-0 rounded-xl px-4 py-2 text-xs font-semibold transition-colors',
                         isEquipped
                           ? 'cursor-default border border-red-800/60 bg-red-950/40 text-red-200'
                           : unlocked
@@ -401,9 +577,9 @@ export function NakaShrineView() {
                         : unlocked
                           ? 'Equipar Olho'
                           : 'Bloqueado'}
-                    </button>
+                    </motion.button>
                   </div>
-                </article>
+                </motion.article>
               );
             })}
           </div>
@@ -436,21 +612,47 @@ export function NakaShrineView() {
                 <Lock className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
                 Desbloqueia com 24.000 Chakra ou 7d seguidos
               </span>
+            ) : !isMangekyouLoreUnlocked ? (
+              <span className="inline-flex items-center gap-1.5 self-start rounded-full border border-red-900/60 bg-red-950/35 px-3 py-1 font-mono tabular-nums text-xs text-red-300">
+                <Sparkles
+                  className="h-3.5 w-3.5 text-red-400"
+                  aria-hidden="true"
+                />
+                Beta Liberado • Lore: 24.000 Chakra ou 7d
+              </span>
             ) : null}
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {MANGEKYOU_VARIANTS.map((info) => {
               const isSelected = mangekyouVariant === info.variant;
+              const isFlashing = variantFlash?.variant === info.variant;
+
               return (
-                <button
+                <motion.button
                   key={info.variant}
                   type="button"
-                  disabled={!isMangekyouUnlocked}
-                  onClick={() => setMangekyouVariant(info.variant)}
+                  disabled={isBetaFullAccess ? false : !isMangekyouUnlocked}
+                  whileHover={
+                    isMangekyouUnlocked && !prefersReducedMotion
+                      ? { y: -3, scale: 1.01 }
+                      : undefined
+                  }
+                  whileTap={
+                    isMangekyouUnlocked && !prefersReducedMotion
+                      ? { scale: 0.98 }
+                      : undefined
+                  }
+                  transition={MICRO_SPRING}
+                  onMouseEnter={() => {
+                    if (isMangekyouUnlocked) {
+                      audioEngine.playHover();
+                    }
+                  }}
+                  onClick={() => handleSelectMangekyouVariant(info.variant)}
                   aria-pressed={isSelected}
                   className={cn(
-                    'group flex flex-col items-center rounded-xl border p-4 text-center transition-colors',
+                    'will-change-transform group relative flex flex-col items-center rounded-xl border p-4 text-center transition-colors',
                     isSelected
                       ? 'border-red-600/80 bg-red-950/25 shadow-[0_0_24px_rgba(220,38,38,0.2)]'
                       : isMangekyouUnlocked
@@ -458,12 +660,45 @@ export function NakaShrineView() {
                         : 'cursor-not-allowed border-zinc-900 bg-[#09090B]/40 opacity-55',
                   )}
                 >
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-zinc-800 bg-black p-1.5 transition-transform duration-300 group-hover:scale-105">
+                  {/* Card-level Ocular Flash Ring */}
+                  <AnimatePresence>
+                    {isFlashing && !prefersReducedMotion && (
+                      <motion.span
+                        key={`variant-card-flash-${variantFlash.nonce}`}
+                        aria-hidden="true"
+                        initial={{ opacity: 0.9, scale: 0.97 }}
+                        animate={{ opacity: 0, scale: 1.04 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.6, ease: FLASH_EASE }}
+                        onAnimationComplete={() =>
+                          setVariantFlash((curr) =>
+                            curr?.nonce === variantFlash.nonce ? null : curr,
+                          )
+                        }
+                        className="pointer-events-none absolute -inset-px rounded-xl border-2 border-[#EF4444] shadow-[0_0_26px_rgba(220,38,38,0.55)] will-change-transform"
+                      />
+                    )}
+                  </AnimatePresence>
+
+                  <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-zinc-800 bg-black p-1.5 transition-transform duration-300 group-hover:scale-105">
                     <SharinganSvg
                       stage="mangekyou"
                       variant={info.variant}
                       className="h-full w-full"
                     />
+                    <AnimatePresence>
+                      {isFlashing && !prefersReducedMotion && (
+                        <motion.span
+                          key={`variant-eye-ring-${variantFlash.nonce}`}
+                          aria-hidden="true"
+                          initial={{ opacity: 0.95, scale: 0.82 }}
+                          animate={{ opacity: 0, scale: 1.5 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.65, ease: FLASH_EASE }}
+                          className="pointer-events-none absolute inset-0 rounded-full border-2 border-[#EF4444] shadow-[0_0_22px_rgba(239,68,68,0.85)] will-change-transform"
+                        />
+                      )}
+                    </AnimatePresence>
                   </div>
                   <span className="mt-3 text-sm font-semibold text-zinc-100">
                     {info.wielder}
@@ -474,7 +709,7 @@ export function NakaShrineView() {
                   <p className="mt-2 text-xs leading-relaxed text-zinc-400">
                     {info.description}
                   </p>
-                </button>
+                </motion.button>
               );
             })}
           </div>

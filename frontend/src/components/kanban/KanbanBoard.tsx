@@ -33,6 +33,7 @@ import { KanbanColumn } from '@/components/kanban/KanbanColumn';
 import { MissionCard } from '@/components/kanban/MissionCard';
 import { NewMissionModal } from '@/components/kanban/NewMissionModal';
 import { RANK_DEFINITIONS, RANK_ORDER } from '@/constants/ranks';
+import { audioEngine } from '@/lib/audioEngine';
 import { formatLocalDate } from '@/lib/date';
 import { sortMissionsAmaterasuFirst } from '@/lib/gamification';
 import { useTsukuyomiStore } from '@/store/useTsukuyomiStore';
@@ -63,6 +64,12 @@ const COLUMN_CONFIG: ReadonlyArray<{
     emptyText: 'Conclua ciclos no Templo ou mova missões encerradas.',
   },
 ];
+
+const CTA_SPRING = {
+  type: 'spring',
+  stiffness: 340,
+  damping: 24,
+} as const;
 
 function isMissionStatus(value: string): value is MissionStatus {
   return (
@@ -169,6 +176,7 @@ export function KanbanBoard() {
   function handleToggleAmaterasu(id: string) {
     const result = toggleMissionAmaterasu(id);
     if (!result.ok && result.reason) {
+      audioEngine.playClick();
       setAmaterasuNotice(result.reason);
     } else {
       setAmaterasuNotice(null);
@@ -231,11 +239,13 @@ export function KanbanBoard() {
     if (!targetStatus) return;
 
     if (draggingMission.status !== targetStatus) {
+      audioEngine.playClick();
       moveMission(activeId, targetStatus);
       return;
     }
 
     if (activeId !== overId && !isMissionStatus(overId)) {
+      audioEngine.playClick();
       reorderMissionsInColumn(targetStatus, activeId, overId);
     }
   }
@@ -368,14 +378,23 @@ export function KanbanBoard() {
               })}
             </div>
 
-            <button
+            <motion.button
               type="button"
-              onClick={() => openNewMissionModal('todo')}
+              whileHover={
+                prefersReducedMotion ? undefined : { y: -2, scale: 1.02 }
+              }
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+              transition={CTA_SPRING}
+              onMouseEnter={() => audioEngine.playHover()}
+              onClick={() => {
+                audioEngine.playClick();
+                openNewMissionModal('todo');
+              }}
               className="inline-flex items-center gap-2 rounded-xl border border-[#DC2626]/75 bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-[#FAFAFA] shadow-[0_0_24px_rgba(220,38,38,0.35)] transition-colors hover:bg-[#EF4444]"
             >
               <Plus className="h-4 w-4" />
               Nova Missão
-            </button>
+            </motion.button>
           </div>
         </header>
 
@@ -396,9 +415,13 @@ export function KanbanBoard() {
               </div>
               <button
                 type="button"
-                onClick={() => setAmaterasuNotice(null)}
+                onMouseEnter={() => audioEngine.playHover()}
+                onClick={() => {
+                  audioEngine.playClick();
+                  setAmaterasuNotice(null);
+                }}
                 aria-label="Fechar aviso do Amaterasu"
-                className="rounded p-1 text-[#A1A1AA] hover:text-[#FAFAFA]"
+                className="rounded p-1 text-[#A1A1AA] transition-colors hover:text-[#FAFAFA]"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -406,7 +429,7 @@ export function KanbanBoard() {
           )}
         </AnimatePresence>
 
-        {/* 3-Column Drag & Drop Board */}
+        {/* 3-Column 2.5D Obsidian Totem Drag & Drop Board */}
         <DndContext
           id="tsukuyomi-kanban-dnd"
           sensors={sensors}
@@ -416,7 +439,10 @@ export function KanbanBoard() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div
+            style={{ perspective: '1400px' }}
+            className="grid grid-cols-1 gap-5 lg:grid-cols-3"
+          >
             {COLUMN_CONFIG.map((column) => (
               <KanbanColumn
                 key={column.status}

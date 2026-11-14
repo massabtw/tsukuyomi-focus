@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   EyeOff,
   Flame,
@@ -12,11 +13,20 @@ import {
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { EYE_STAGES } from '@/constants/evolution';
+import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import { useTsukuyomiStore } from '@/store/useTsukuyomiStore';
 import type { EyeStage } from '@/types/tsukuyomi';
 
+const DEV_BUTTON_SPRING = {
+  type: 'spring',
+  stiffness: 350,
+  damping: 24,
+} as const;
+
 export function DevSimulatorBar() {
+  const prefersReducedMotion = Boolean(useReducedMotion());
+
   const {
     chakra,
     izanagi,
@@ -42,6 +52,9 @@ export function DevSimulatorBar() {
   const [selectedAwakeningStage, setSelectedAwakeningStage] =
     useState<EyeStage>('mangekyou');
 
+  const hoverMotion = prefersReducedMotion ? undefined : { y: -3, scale: 1.01 };
+  const tapMotion = prefersReducedMotion ? undefined : { scale: 0.98 };
+
   return (
     <aside
       aria-label="Simulador Dev Mode do Santuário Naka"
@@ -64,46 +77,81 @@ export function DevSimulatorBar() {
             <Zap className="h-3 w-3 text-red-400" aria-hidden="true" />
             Chakra:
           </span>
-          <button
+          <motion.button
             type="button"
-            onClick={() => devAddChakra(1000)}
-            className="rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 font-mono tabular-nums text-xs text-zinc-200 transition-colors hover:border-red-700/70 hover:text-white"
+            whileHover={hoverMotion}
+            whileTap={tapMotion}
+            transition={DEV_BUTTON_SPRING}
+            onMouseEnter={() => audioEngine.playHover()}
+            onClick={() => {
+              audioEngine.playClick();
+              devAddChakra(1000);
+            }}
+            className="will-change-transform rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 font-mono tabular-nums text-xs text-zinc-200 transition-colors hover:border-red-700/70 hover:text-white"
           >
             +1.000
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             type="button"
-            onClick={() => devAddChakra(10000)}
-            className="rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 font-mono tabular-nums text-xs text-zinc-200 transition-colors hover:border-red-700/70 hover:text-white"
+            whileHover={hoverMotion}
+            whileTap={tapMotion}
+            transition={DEV_BUTTON_SPRING}
+            onMouseEnter={() => audioEngine.playHover()}
+            onClick={() => {
+              audioEngine.playClick();
+              devAddChakra(10000);
+            }}
+            className="will-change-transform rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 font-mono tabular-nums text-xs text-zinc-200 transition-colors hover:border-red-700/70 hover:text-white"
           >
             +10.000
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             type="button"
-            onClick={() => devAddChakra(50000)}
-            className="rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 font-mono tabular-nums text-xs text-zinc-200 transition-colors hover:border-red-700/70 hover:text-white"
+            whileHover={hoverMotion}
+            whileTap={tapMotion}
+            transition={DEV_BUTTON_SPRING}
+            onMouseEnter={() => audioEngine.playHover()}
+            onClick={() => {
+              audioEngine.playClick();
+              devAddChakra(50000);
+            }}
+            className="will-change-transform rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 font-mono tabular-nums text-xs text-zinc-200 transition-colors hover:border-red-700/70 hover:text-white"
           >
             +50.000
-          </button>
+          </motion.button>
         </div>
 
         {/* Unlock all */}
-        <button
+        <motion.button
           type="button"
-          onClick={devUnlockAllEyes}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-[#121215] px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:border-red-700/70 hover:bg-red-950/30"
+          whileHover={hoverMotion}
+          whileTap={tapMotion}
+          transition={DEV_BUTTON_SPRING}
+          onMouseEnter={() => audioEngine.playHover()}
+          onClick={() => {
+            audioEngine.playClick();
+            devUnlockAllEyes();
+          }}
+          className="will-change-transform inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-[#121215] px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:border-red-700/70 hover:bg-red-950/30"
         >
           <Unlock className="h-3.5 w-3.5 text-red-400" aria-hidden="true" />
           <span>Desbloquear Todos</span>
-        </button>
+        </motion.button>
 
         {/* Izanagi eye blindness */}
         <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800/90 bg-[#121215] p-1">
-          <button
+          <motion.button
             type="button"
-            onClick={() => devToggleEyeBlindness('right')}
+            whileHover={hoverMotion}
+            whileTap={tapMotion}
+            transition={DEV_BUTTON_SPRING}
+            onMouseEnter={() => audioEngine.playHover()}
+            onClick={() => {
+              audioEngine.playClick();
+              devToggleEyeBlindness('right');
+            }}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors',
+              'will-change-transform inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors',
               izanagi.rightEyeBlind
                 ? 'bg-zinc-800 text-zinc-400 line-through'
                 : 'bg-red-950/50 text-red-200 hover:bg-red-900/50',
@@ -111,12 +159,19 @@ export function DevSimulatorBar() {
           >
             <EyeOff className="h-3 w-3" aria-hidden="true" />
             <span>Dir. {izanagi.rightEyeBlind ? '(Cego)' : '(Ativo)'}</span>
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             type="button"
-            onClick={() => devToggleEyeBlindness('left')}
+            whileHover={hoverMotion}
+            whileTap={tapMotion}
+            transition={DEV_BUTTON_SPRING}
+            onMouseEnter={() => audioEngine.playHover()}
+            onClick={() => {
+              audioEngine.playClick();
+              devToggleEyeBlindness('left');
+            }}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors',
+              'will-change-transform inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors',
               izanagi.leftEyeBlind
                 ? 'bg-zinc-800 text-zinc-400 line-through'
                 : 'bg-red-950/50 text-red-200 hover:bg-red-900/50',
@@ -124,7 +179,7 @@ export function DevSimulatorBar() {
           >
             <EyeOff className="h-3 w-3" aria-hidden="true" />
             <span>Esq. {izanagi.leftEyeBlind ? '(Cego)' : '(Ativo)'}</span>
-          </button>
+          </motion.button>
         </div>
 
         {/* Awakening preview */}
@@ -135,9 +190,11 @@ export function DevSimulatorBar() {
           <select
             id="dev-awakening-stage"
             value={selectedAwakeningStage}
-            onChange={(e) =>
-              setSelectedAwakeningStage(e.target.value as EyeStage)
-            }
+            onMouseEnter={() => audioEngine.playHover()}
+            onChange={(e) => {
+              audioEngine.playClick();
+              setSelectedAwakeningStage(e.target.value as EyeStage);
+            }}
             className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-red-600 focus:outline-none"
           >
             {EYE_STAGES.map((stage) => (
@@ -146,35 +203,56 @@ export function DevSimulatorBar() {
               </option>
             ))}
           </select>
-          <button
+          <motion.button
             type="button"
-            onClick={() => devTriggerAwakening(selectedAwakeningStage)}
-            className="inline-flex items-center gap-1 rounded-md border border-red-900/70 bg-red-950/40 px-2.5 py-1 text-xs font-medium text-red-200 transition-colors hover:bg-red-900/50"
+            whileHover={hoverMotion}
+            whileTap={tapMotion}
+            transition={DEV_BUTTON_SPRING}
+            onMouseEnter={() => audioEngine.playHover()}
+            onClick={() => {
+              audioEngine.playClick();
+              devTriggerAwakening(selectedAwakeningStage);
+            }}
+            className="will-change-transform inline-flex items-center gap-1 rounded-md border border-red-900/70 bg-red-950/40 px-2.5 py-1 text-xs font-medium text-red-200 transition-colors hover:bg-red-900/50"
           >
             <Sparkles className="h-3 w-3" aria-hidden="true" />
             <span>Simular Despertar</span>
-          </button>
+          </motion.button>
         </div>
 
         {/* Day turn Amaterasu penalty */}
-        <button
+        <motion.button
           type="button"
-          onClick={devSimulateDayTurnWithAmaterasu}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-red-900/70 bg-black px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:border-red-600 hover:text-red-200"
+          whileHover={hoverMotion}
+          whileTap={tapMotion}
+          transition={DEV_BUTTON_SPRING}
+          onMouseEnter={() => audioEngine.playHover()}
+          onClick={() => {
+            audioEngine.playClick();
+            devSimulateDayTurnWithAmaterasu();
+          }}
+          className="will-change-transform inline-flex items-center gap-1.5 rounded-lg border border-red-900/70 bg-black px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:border-red-600 hover:text-red-200"
         >
           <Flame className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
           <span>Virada Amaterasu (-300)</span>
-        </button>
+        </motion.button>
 
         {/* Reset seed */}
-        <button
+        <motion.button
           type="button"
-          onClick={devResetToSeed}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white"
+          whileHover={hoverMotion}
+          whileTap={tapMotion}
+          transition={DEV_BUTTON_SPRING}
+          onMouseEnter={() => audioEngine.playHover()}
+          onClick={() => {
+            audioEngine.playClick();
+            devResetToSeed();
+          }}
+          className="will-change-transform ml-auto inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white"
         >
           <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
           <span>Resetar Seed</span>
-        </button>
+        </motion.button>
       </div>
     </aside>
   );

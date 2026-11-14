@@ -10,6 +10,7 @@ export interface SharinganSvgProps {
   className?: string;
   isAwakening?: boolean;
   isUrgent?: boolean;
+  isSpinBurst?: boolean;
 }
 
 const TOMOE_ANGLES: Record<'tomoe_1' | 'tomoe_2' | 'tomoe_3', readonly number[]> = {
@@ -21,9 +22,9 @@ const TOMOE_ANGLES: Record<'tomoe_1' | 'tomoe_2' | 'tomoe_3', readonly number[]>
 function TomoeMark({ angle }: { angle: number }) {
   return (
     <g transform={`rotate(${angle} 100 100)`}>
-      <circle cx="100" cy="46" r="7.5" fill="#09090B" />
+      <circle cx="100" cy="46" r="7.8" fill="#09090B" />
       <path
-        d="M 101.5 38.6 C 111 39.5 119 44.5 123 51.8 C 117.5 47.5 111.5 48.2 106.2 50.4 Z"
+        d="M 101.2 38.2 C 111.8 39 120.5 44.6 125 53.2 C 118.4 48.2 111.6 48.4 105.8 51.2 Z"
         fill="#09090B"
       />
     </g>
@@ -45,7 +46,7 @@ function MangekyouPattern({
             <path
               key={angle}
               transform={`rotate(${angle} 100 100)`}
-              d="M 90 83 C 88 52 106 32 138 26 C 122 46 116 64 117 85 Z"
+              d="M 89 83 C 87 50 108 28 142 23 C 124 44 117 63 118 85 Z"
               fill="#09090B"
             />
           ))}
@@ -70,9 +71,9 @@ function MangekyouPattern({
             <path
               key={angle}
               transform={`rotate(${angle} 100 100)`}
-              d="M 100 15 C 129 48 129 152 100 185 C 71 152 71 48 100 15 Z"
+              d="M 100 14 C 130 48 130 152 100 186 C 70 152 70 48 100 14 Z"
               fill={`url(#${irisGradientId})`}
-              fillOpacity="0.92"
+              fillOpacity="0.94"
               stroke="#09090B"
               strokeWidth="6.5"
               strokeLinejoin="round"
@@ -82,7 +83,7 @@ function MangekyouPattern({
             <path
               key={`inner-${angle}`}
               transform={`rotate(${angle} 100 100)`}
-              d="M 100 15 C 129 48 129 152 100 185 C 71 152 71 48 100 15 Z"
+              d="M 100 14 C 130 48 130 152 100 186 C 70 152 70 48 100 14 Z"
               fill="none"
               stroke="#09090B"
               strokeWidth="4.5"
@@ -99,7 +100,7 @@ function MangekyouPattern({
             <path
               key={angle}
               transform={`rotate(${angle} 100 100)`}
-              d="M 91 81 C 89 49 112 24 146 24 C 124 41 116 61 118 82 Z"
+              d="M 90 81 C 88 48 112 22 148 22 C 125 40 116 61 118 82 Z"
               fill="#09090B"
             />
           ))}
@@ -122,7 +123,7 @@ function MangekyouPattern({
             <path
               key={angle}
               transform={`rotate(${angle} 100 100)`}
-              d="M 93 82 C 88 51 104 22 142 22 C 158 22 164 38 152 46 C 154 34 142 30 128 36 C 114 44 112 64 116 84 Z"
+              d="M 92 82 C 87 49 104 20 145 20 C 162 20 168 38 154 47 C 156 34 143 29 128 36 C 114 44 112 64 116 84 Z"
               fill="#09090B"
             />
           ))}
@@ -152,7 +153,7 @@ function MangekyouPattern({
           {[0, 120, 240].map((angle) => (
             <g key={angle} transform={`rotate(${angle} 100 100)`}>
               <path
-                d="M 104 42 C 134 42 156 62 163 88 C 147 69 128 59 104 57 Z"
+                d="M 104 42 C 135 42 157 62 164 89 C 148 69 129 59 104 57 Z"
                 fill="#09090B"
               />
               <circle cx="100" cy="54" r="14.5" fill="#09090B" />
@@ -171,6 +172,7 @@ export function SharinganSvg({
   className,
   isAwakening = false,
   isUrgent = false,
+  isSpinBurst = false,
 }: SharinganSvgProps) {
   const rawId = useId();
   const safeId = rawId.replace(/:/g, '');
@@ -191,6 +193,14 @@ export function SharinganSvg({
       : `url(#${irisGradId})`;
 
   const label = `Olho ${stage}${stage === 'mangekyou' ? ` (${variant})` : ''}`;
+  const hasKineticCorona = isAwakening || isUrgent || isSpinBurst;
+  const pupilRadius = isRinnegan
+    ? 11
+    : stage === 'normal'
+      ? 18
+      : isSpinBurst
+        ? 15.5
+        : 14;
 
   return (
     <svg
@@ -201,9 +211,9 @@ export function SharinganSvg({
     >
       <defs>
         <radialGradient id={irisGradId} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={isUrgent ? '#EF4444' : '#DC2626'} />
-          <stop offset="55%" stopColor={isUrgent ? '#DC2626' : '#B91C1C'} />
-          <stop offset="86%" stopColor="#7F1D1D" />
+          <stop offset="0%" stopColor={isUrgent || isSpinBurst ? '#EF4444' : '#DC2626'} />
+          <stop offset="54%" stopColor={isUrgent ? '#DC2626' : '#B91C1C'} />
+          <stop offset="85%" stopColor="#7F1D1D" />
           <stop offset="100%" stopColor="#450A0A" />
         </radialGradient>
 
@@ -221,25 +231,25 @@ export function SharinganSvg({
         </radialGradient>
 
         <radialGradient id={shadowGradId} cx="50%" cy="50%" r="50%">
-          <stop offset="72%" stopColor="rgba(0,0,0,0)" />
-          <stop offset="93%" stopColor="rgba(9,9,11,0.55)" />
-          <stop offset="100%" stopColor="rgba(0,0,0,0.92)" />
+          <stop offset="68%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="91%" stopColor="rgba(9,9,11,0.58)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.94)" />
         </radialGradient>
       </defs>
 
       {/* Base Iris */}
       <circle cx="100" cy="100" r="93" fill={irisFill} />
 
-      {/* Subtle organic iris striations */}
+      {/* Subtle Organic Iris Striations */}
       {!isRinnegan && (
-        <g stroke="#09090B" strokeWidth="1" strokeOpacity={isNormal ? 0.35 : 0.14}>
+        <g stroke="#09090B" strokeWidth="1" strokeOpacity={isNormal ? 0.35 : 0.15}>
           {Array.from({ length: 16 }, (_, idx) => {
             const angle = idx * 22.5;
             return (
               <line
                 key={angle}
                 x1="100"
-                y1="26"
+                y1="24"
                 x2="100"
                 y2="42"
                 transform={`rotate(${angle} 100 100)`}
@@ -294,7 +304,7 @@ export function SharinganSvg({
               fill="#09090B"
               stroke="#DC2626"
               strokeWidth="1.4"
-              strokeOpacity="0.8"
+              strokeOpacity="0.82"
             />
           ))}
           <circle
@@ -333,16 +343,16 @@ export function SharinganSvg({
         strokeWidth="6"
       />
 
-      {/* Awakening / Urgency Inner Corona */}
-      {(isAwakening || isUrgent) && (
+      {/* Awakening / Spin Burst / Urgency Inner Corona */}
+      {hasKineticCorona && (
         <circle
           cx="100"
           cy="100"
           r="89"
           fill="none"
           stroke={isRinnegan ? '#C4B5FD' : '#EF4444'}
-          strokeWidth={isAwakening ? '2.2' : '1.4'}
-          strokeOpacity={isAwakening ? 0.8 : 0.55}
+          strokeWidth={isSpinBurst || isAwakening ? '2.4' : '1.4'}
+          strokeOpacity={isSpinBurst || isAwakening ? 0.85 : 0.55}
         />
       )}
 
@@ -350,7 +360,7 @@ export function SharinganSvg({
       <circle
         cx="100"
         cy="100"
-        r={isRinnegan ? 11 : stage === 'normal' ? 18 : 14}
+        r={pupilRadius}
         fill="#000000"
       />
 
@@ -362,9 +372,17 @@ export function SharinganSvg({
         ry="3.6"
         transform="rotate(-32 84 79)"
         fill="#FFFFFF"
-        fillOpacity={isNormal ? 0.34 : 0.45}
+        fillOpacity={isNormal ? 0.34 : 0.48}
       />
-      <circle cx="115" cy="116" r="2.1" fill="#FFFFFF" fillOpacity="0.2" />
+      <circle cx="115" cy="116" r="2.1" fill="#FFFFFF" fillOpacity="0.22" />
+      <path
+        d="M 52 58 A 66 66 0 0 1 82 38"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeOpacity={isNormal ? 0.1 : 0.16}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

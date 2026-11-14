@@ -16,6 +16,7 @@ import {
   useTransform,
 } from 'framer-motion';
 import { EYE_STAGE_MAP } from '@/constants/evolution';
+import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import { computeScrollStats } from '@/lib/gamification';
 import { useOcularProfile, useTsukuyomiStore } from '@/store/useTsukuyomiStore';
@@ -24,6 +25,11 @@ import { SessionLogList } from '@/components/scroll/SessionLogList';
 import { UchihaHeatmap } from '@/components/scroll/UchihaHeatmap';
 
 const WILL_CHANGE_TRANSFORM = { willChange: 'transform' } as const;
+const KPI_SPRING = {
+  type: 'spring',
+  stiffness: 330,
+  damping: 24,
+} as const;
 
 function formatHoursAndMinutes(totalMinutes: number): string {
   const safe = Math.max(0, Math.round(totalMinutes));
@@ -66,6 +72,9 @@ export function ScrollStatsView() {
   const activeEyesCount =
     (izanagi.leftEyeBlind ? 0 : 1) + (izanagi.rightEyeBlind ? 0 : 1);
 
+  const kpiHover = prefersReducedMotion ? undefined : { y: -3, scale: 1.01 };
+  const kpiTap = prefersReducedMotion ? undefined : { scale: 0.98 };
+
   return (
     <div
       ref={containerRef}
@@ -103,7 +112,13 @@ export function ScrollStatsView() {
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
         {/* 1. Total Focus Time (Xh Ym) */}
-        <article className="obsidian-surface rounded-2xl p-5">
+        <motion.article
+          whileHover={kpiHover}
+          whileTap={kpiTap}
+          transition={KPI_SPRING}
+          onMouseEnter={() => audioEngine.playHover()}
+          className="obsidian-surface will-change-transform rounded-2xl p-5"
+        >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Tempo Total no Tsukuyomi</span>
             <Clock className="h-4 w-4 text-red-500" aria-hidden="true" />
@@ -115,10 +130,16 @@ export function ScrollStatsView() {
             {stats.completedSessions} ciclos concluídos ·{' '}
             {stats.susanooCompletedCount} com Susano&apos;o
           </p>
-        </article>
+        </motion.article>
 
         {/* 2. Total Chakra & Current Eye Stage */}
-        <article className="obsidian-surface rounded-2xl p-5">
+        <motion.article
+          whileHover={kpiHover}
+          whileTap={kpiTap}
+          transition={KPI_SPRING}
+          onMouseEnter={() => audioEngine.playHover()}
+          className="obsidian-surface will-change-transform rounded-2xl p-5"
+        >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Chakra Total &amp; Estágio Ocular</span>
             <Sparkles className="h-4 w-4 text-red-500" aria-hidden="true" />
@@ -130,10 +151,16 @@ export function ScrollStatsView() {
             <Eye className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
             <span>{currentEyeDef.name}</span>
           </p>
-        </article>
+        </motion.article>
 
         {/* 3. Current / Longest Streak */}
-        <article className="obsidian-surface rounded-2xl p-5">
+        <motion.article
+          whileHover={kpiHover}
+          whileTap={kpiTap}
+          transition={KPI_SPRING}
+          onMouseEnter={() => audioEngine.playHover()}
+          className="obsidian-surface will-change-transform rounded-2xl p-5"
+        >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Ofensiva Diária (Streak)</span>
             <Flame
@@ -151,10 +178,16 @@ export function ScrollStatsView() {
             Recorde histórico: {longestStreak}{' '}
             {longestStreak === 1 ? 'dia' : 'dias'}
           </p>
-        </article>
+        </motion.article>
 
         {/* 4. Uchiha Accuracy % */}
-        <article className="obsidian-surface rounded-2xl p-5">
+        <motion.article
+          whileHover={kpiHover}
+          whileTap={kpiTap}
+          transition={KPI_SPRING}
+          onMouseEnter={() => audioEngine.playHover()}
+          className="obsidian-surface will-change-transform rounded-2xl p-5"
+        >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Precisão Uchiha</span>
             <Crosshair className="h-4 w-4 text-red-500" aria-hidden="true" />
@@ -166,10 +199,16 @@ export function ScrollStatsView() {
             {stats.completedSessions} íntegros · {stats.abandonedSessions}{' '}
             abandonados
           </p>
-        </article>
+        </motion.article>
 
         {/* 5. Izanagi Invocations */}
-        <article className="obsidian-surface rounded-2xl p-5">
+        <motion.article
+          whileHover={kpiHover}
+          whileTap={kpiTap}
+          transition={KPI_SPRING}
+          onMouseEnter={() => audioEngine.playHover()}
+          className="obsidian-surface will-change-transform rounded-2xl p-5"
+        >
           <div className="flex items-center justify-between text-xs text-zinc-400">
             <span>Invocações do Izanagi</span>
             <RefreshCw className="h-4 w-4 text-red-500" aria-hidden="true" />
@@ -180,10 +219,16 @@ export function ScrollStatsView() {
           <p className="mt-1.5 font-mono text-xs text-zinc-500 tabular-nums">
             {activeEyesCount}/2 olhos ativos para reescrever a realidade
           </p>
-        </article>
+        </motion.article>
 
         {/* 6. Amaterasu Completed (strict #000000 / #DC2626 palette) */}
-        <article className="amaterasu-frame rounded-2xl p-5">
+        <motion.article
+          whileHover={kpiHover}
+          whileTap={kpiTap}
+          transition={KPI_SPRING}
+          onMouseEnter={() => audioEngine.playHover()}
+          className="amaterasu-frame will-change-transform rounded-2xl p-5"
+        >
           <div className="flex items-center justify-between text-xs text-zinc-300">
             <span>Missões Amaterasu Concluídas</span>
             <Flame className="h-4 w-4 text-[#DC2626]" aria-hidden="true" />
@@ -194,7 +239,7 @@ export function ScrollStatsView() {
           <p className="mt-1.5 text-xs text-red-400/90">
             Chamas negras seladas com bônus 2.0x
           </p>
-        </article>
+        </motion.article>
       </section>
 
       {/* 365-Day Crimson Heatmap */}

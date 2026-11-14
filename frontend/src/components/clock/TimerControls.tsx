@@ -1,5 +1,6 @@
 'use client';
 
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   Eye,
   Lock,
@@ -16,6 +17,7 @@ import {
   SUSANOO_MIN_RECOMMENDED_MINUTES,
   TIMER_PRESETS_MINUTES,
 } from '@/constants/ranks';
+import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import { canInvokeIzanagi } from '@/lib/gamification';
 import {
@@ -28,10 +30,17 @@ export interface TimerControlsProps {
   onOpenIzanagiAbandon: () => void;
 }
 
+const CONTROL_SPRING = {
+  type: 'spring',
+  stiffness: 420,
+  damping: 26,
+} as const;
+
 export function TimerControls({
   onOpenSusanooBreak,
   onOpenIzanagiAbandon,
 }: TimerControlsProps) {
+  const prefersReducedMotion = useReducedMotion();
   const { status, mode, durationSeconds, activeMissionId, susanooEnabled } =
     useTimerCore();
   const izanagi = useTsukuyomiStore((state) => state.izanagi);
@@ -67,6 +76,23 @@ export function TimerControls({
     ? RANK_DEFINITIONS[activeMission.rank]
     : null;
 
+  const activeMotionProps = prefersReducedMotion
+    ? {}
+    : {
+        whileHover: { y: -1 },
+        whileTap: { scale: 0.97 },
+        transition: CONTROL_SPRING,
+      };
+
+  const idleOnlyMotionProps =
+    isIdle && !prefersReducedMotion
+      ? {
+          whileHover: { y: -1 },
+          whileTap: { scale: 0.97 },
+          transition: CONTROL_SPRING,
+        }
+      : {};
+
   return (
     <div className="obsidian-surface w-full rounded-xl p-4 sm:p-5">
       {/* Presets Row */}
@@ -87,13 +113,20 @@ export function TimerControls({
           {TIMER_PRESETS_MINUTES.focus.map((minutes) => {
             const active = isFocus && durationMinutes === minutes;
             return (
-              <button
+              <motion.button
                 key={`focus-${minutes}`}
                 type="button"
                 disabled={!isIdle}
-                onClick={() => setTimerMode('focus', minutes * 60)}
+                {...idleOnlyMotionProps}
+                onMouseEnter={() => {
+                  if (isIdle) audioEngine.playHover();
+                }}
+                onClick={() => {
+                  audioEngine.playClick();
+                  setTimerMode('focus', minutes * 60);
+                }}
                 className={cn(
-                  'rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors',
+                  'rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors will-change-transform',
                   active
                     ? 'border-red-600/80 bg-red-950/50 text-zinc-50'
                     : 'border-zinc-800 bg-zinc-950/70 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
@@ -101,18 +134,25 @@ export function TimerControls({
                 )}
               >
                 {minutes}m
-              </button>
+              </motion.button>
             );
           })}
 
           {/* Mission Rank Auto Preset */}
           {activeMission && missionMinutes !== null && missionRankDef && (
-            <button
+            <motion.button
               type="button"
               disabled={!isIdle}
-              onClick={() => setTimerMode('focus', missionMinutes * 60)}
+              {...idleOnlyMotionProps}
+              onMouseEnter={() => {
+                if (isIdle) audioEngine.playHover();
+              }}
+              onClick={() => {
+                audioEngine.playClick();
+                setTimerMode('focus', missionMinutes * 60);
+              }}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors',
+                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors will-change-transform',
                 isFocus && durationMinutes === missionMinutes
                   ? 'border-red-600/80 bg-red-950/50 text-zinc-50'
                   : 'border-zinc-800 bg-zinc-950/70 text-zinc-300 hover:border-zinc-700',
@@ -124,7 +164,7 @@ export function TimerControls({
               <span>
                 Rank {activeMission.rank} ({missionMinutes}m)
               </span>
-            </button>
+            </motion.button>
           )}
 
           <div
@@ -137,13 +177,20 @@ export function TimerControls({
             const active =
               mode === 'short_break' && durationMinutes === minutes;
             return (
-              <button
+              <motion.button
                 key={`short-${minutes}`}
                 type="button"
                 disabled={!isIdle}
-                onClick={() => setTimerMode('short_break', minutes * 60)}
+                {...idleOnlyMotionProps}
+                onMouseEnter={() => {
+                  if (isIdle) audioEngine.playHover();
+                }}
+                onClick={() => {
+                  audioEngine.playClick();
+                  setTimerMode('short_break', minutes * 60);
+                }}
                 className={cn(
-                  'rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors',
+                  'rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors will-change-transform',
                   active
                     ? 'border-red-600/70 bg-red-950/40 text-zinc-100'
                     : 'border-zinc-800 bg-zinc-950/70 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
@@ -151,7 +198,7 @@ export function TimerControls({
                 )}
               >
                 Pausa {minutes}m
-              </button>
+              </motion.button>
             );
           })}
 
@@ -159,13 +206,20 @@ export function TimerControls({
           {TIMER_PRESETS_MINUTES.longBreak.map((minutes) => {
             const active = mode === 'long_break' && durationMinutes === minutes;
             return (
-              <button
+              <motion.button
                 key={`long-${minutes}`}
                 type="button"
                 disabled={!isIdle}
-                onClick={() => setTimerMode('long_break', minutes * 60)}
+                {...idleOnlyMotionProps}
+                onMouseEnter={() => {
+                  if (isIdle) audioEngine.playHover();
+                }}
+                onClick={() => {
+                  audioEngine.playClick();
+                  setTimerMode('long_break', minutes * 60);
+                }}
                 className={cn(
-                  'rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors',
+                  'rounded-lg border px-2.5 py-1.5 font-mono text-xs tabular-nums transition-colors will-change-transform',
                   active
                     ? 'border-red-600/70 bg-red-950/40 text-zinc-100'
                     : 'border-zinc-800 bg-zinc-950/70 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
@@ -173,7 +227,7 @@ export function TimerControls({
                 )}
               >
                 Longa {minutes}m
-              </button>
+              </motion.button>
             );
           })}
         </div>
@@ -207,15 +261,22 @@ export function TimerControls({
             </div>
           </div>
 
-          <button
+          <motion.button
             type="button"
             role="switch"
             aria-checked={susanooEnabled}
             aria-label="Ativar Armadura Susano'o"
             disabled={!isIdle}
-            onClick={() => setSusanooEnabled(!susanooEnabled)}
+            {...idleOnlyMotionProps}
+            onMouseEnter={() => {
+              if (isIdle) audioEngine.playHover();
+            }}
+            onClick={() => {
+              audioEngine.playClick();
+              setSusanooEnabled(!susanooEnabled);
+            }}
             className={cn(
-              'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors',
+              'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors will-change-transform',
               susanooEnabled
                 ? 'border-red-500/70 bg-red-700/80'
                 : 'border-zinc-700 bg-zinc-900',
@@ -228,7 +289,7 @@ export function TimerControls({
                 susanooEnabled ? 'translate-x-6' : 'translate-x-1',
               )}
             />
-          </button>
+          </motion.button>
         </div>
       )}
 
@@ -236,26 +297,36 @@ export function TimerControls({
       <div className="mt-4 flex flex-wrap items-center gap-2.5">
         {isIdle && (
           <>
-            <button
+            <motion.button
               type="button"
-              onClick={startTimer}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-500/50 bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(220,38,38,0.35)] transition-colors hover:bg-red-500"
+              {...activeMotionProps}
+              onMouseEnter={() => audioEngine.playHover()}
+              onClick={() => {
+                audioEngine.playClick();
+                startTimer();
+              }}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-500/50 bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(220,38,38,0.35)] transition-colors hover:bg-red-500 will-change-transform"
             >
               <Play className="h-4 w-4 fill-current" aria-hidden="true" />
               <span>
                 {isFocus ? 'Ativar Tsukuyomi' : 'Iniciar Repouso Ocular'}
               </span>
-            </button>
+            </motion.button>
 
-            <button
+            <motion.button
               type="button"
-              onClick={resetTimer}
+              {...activeMotionProps}
+              onMouseEnter={() => audioEngine.playHover()}
+              onClick={() => {
+                audioEngine.playClick();
+                resetTimer();
+              }}
               aria-label="Resetar cronômetro"
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 will-change-transform"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Resetar</span>
-            </button>
+            </motion.button>
           </>
         )}
 
@@ -266,71 +337,101 @@ export function TimerControls({
               <span>Selo Susano&apos;o ativo — pausa bloqueada</span>
             </div>
 
-            <button
+            <motion.button
               type="button"
-              onClick={onOpenSusanooBreak}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-600/70 bg-black px-4 py-2.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-950/50 hover:text-red-300"
+              {...activeMotionProps}
+              onMouseEnter={() => audioEngine.playHover()}
+              onClick={() => {
+                audioEngine.playClick();
+                onOpenSusanooBreak();
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-600/70 bg-black px-4 py-2.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-950/50 hover:text-red-300 will-change-transform"
             >
               <ShieldAlert className="h-4 w-4" aria-hidden="true" />
               <span>Quebrar Selo do Susano&apos;o</span>
-            </button>
+            </motion.button>
           </div>
         )}
 
         {!isIdle && !isSusanooSealed && (
           <>
             {isRunning ? (
-              <button
+              <motion.button
                 type="button"
-                onClick={pauseTimer}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-zinc-100 transition-colors hover:border-zinc-600 hover:bg-zinc-800"
+                {...activeMotionProps}
+                onMouseEnter={() => audioEngine.playHover()}
+                onClick={() => {
+                  audioEngine.playClick();
+                  pauseTimer();
+                }}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-zinc-100 transition-colors hover:border-zinc-600 hover:bg-zinc-800 will-change-transform"
               >
                 <Pause className="h-4 w-4" aria-hidden="true" />
                 <span>Pausar</span>
-              </button>
+              </motion.button>
             ) : isPaused ? (
-              <button
+              <motion.button
                 type="button"
-                onClick={startTimer}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-500/50 bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500"
+                {...activeMotionProps}
+                onMouseEnter={() => audioEngine.playHover()}
+                onClick={() => {
+                  audioEngine.playClick();
+                  startTimer();
+                }}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-500/50 bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500 will-change-transform"
               >
                 <Play className="h-4 w-4 fill-current" aria-hidden="true" />
                 <span>Retomar</span>
-              </button>
+              </motion.button>
             ) : null}
 
             {!isFocus ? (
-              <button
+              <motion.button
                 type="button"
-                onClick={() => abandonActiveCycle()}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
+                {...activeMotionProps}
+                onMouseEnter={() => audioEngine.playHover()}
+                onClick={() => {
+                  audioEngine.playClick();
+                  abandonActiveCycle();
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 will-change-transform"
               >
                 <XCircle className="h-4 w-4" aria-hidden="true" />
                 <span>Encerrar Pausa</span>
-              </button>
+              </motion.button>
             ) : (
               <>
                 {izanagiAvailable && (
-                  <button
+                  <motion.button
                     type="button"
-                    onClick={onOpenIzanagiAbandon}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/40 bg-red-950/35 px-3.5 py-2.5 text-xs font-medium text-red-300 transition-colors hover:border-red-500/70 hover:bg-red-950/60"
+                    {...activeMotionProps}
+                    onMouseEnter={() => audioEngine.playHover()}
+                    onClick={() => {
+                      audioEngine.playClick();
+                      onOpenIzanagiAbandon();
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/40 bg-red-950/35 px-3.5 py-2.5 text-xs font-medium text-red-300 transition-colors hover:border-red-500/70 hover:bg-red-950/60 will-change-transform"
                     title="Reescrever abandono sacrificando visão temporária em vez de perder acuidade"
                   >
                     <Eye className="h-4 w-4 text-red-400" aria-hidden="true" />
                     <span>Invocar Izanagi</span>
-                  </button>
+                  </motion.button>
                 )}
 
-                <button
+                <motion.button
                   type="button"
-                  onClick={() => abandonActiveCycle({ useIzanagi: false })}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs font-medium text-zinc-400 transition-colors hover:border-red-900/70 hover:text-red-300"
+                  {...activeMotionProps}
+                  onMouseEnter={() => audioEngine.playHover()}
+                  onClick={() => {
+                    audioEngine.playClick();
+                    abandonActiveCycle({ useIzanagi: false });
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs font-medium text-zinc-400 transition-colors hover:border-red-900/70 hover:text-red-300 will-change-transform"
                   title="Abandonar ciclo (+1 desgaste visual)"
                 >
                   <XCircle className="h-4 w-4" aria-hidden="true" />
                   <span>Abandonar</span>
-                </button>
+                </motion.button>
               </>
             )}
           </>
