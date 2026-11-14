@@ -16,7 +16,6 @@ import { TempleView } from '@/components/clock/TempleView';
 import { useDailyChecks } from '@/hooks/useDailyChecks';
 import { useFocusTimer } from '@/hooks/useFocusTimer';
 import { cn } from '@/lib/cn';
-import { getVisualBlurClass } from '@/lib/gamification';
 import {
   useActiveTab,
   useHasHydrated,
@@ -68,7 +67,7 @@ const UCHIHA_CHAKRA_PALETTES: Record<MangekyouVariant, ChakraPalette> = {
 };
 
 const DOLLY_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
-const WILL_CHANGE_TAB = { willChange: 'transform, opacity, filter' } as const;
+const WILL_CHANGE_TAB = { willChange: 'transform, opacity' } as const;
 
 function HydrationSkeleton() {
   return (
@@ -181,10 +180,10 @@ export function TsukuyomiApp() {
         transition: { duration: 0 },
       }
     : {
-        initial: { opacity: 0, scale: 0.97, filter: 'blur(6px)' },
-        animate: { opacity: 1, scale: 1, filter: 'blur(0px)' },
-        exit: { opacity: 0, scale: 1.02, filter: 'blur(4px)' },
-        transition: { duration: 0.45, ease: DOLLY_EASE },
+        initial: { opacity: 0, y: 8, scale: 0.985 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: -6, scale: 0.99 },
+        transition: { duration: 0.35, ease: DOLLY_EASE },
       };
 
   const chakraStyle: ChakraCssVars = {
@@ -199,7 +198,7 @@ export function TsukuyomiApp() {
       data-tsukuyomi={isTsukuyomiMode ? 'true' : 'false'}
       style={chakraStyle}
       className={cn(
-        'relative flex min-h-screen flex-col transition-colors duration-700',
+        'relative flex min-h-screen flex-col overflow-x-hidden transition-colors duration-700',
         isTsukuyomiMode
           ? 'tsukuyomi-mode bg-[#000000] text-white'
           : 'bg-[#09090B] text-[#FAFAFA]',
@@ -231,16 +230,9 @@ export function TsukuyomiApp() {
       <div className="relative z-10 flex min-h-screen flex-col">
         <NinjaHeader />
 
-        <div
-          className={cn(
-            'transition-[filter] duration-300 hover:blur-none focus-within:blur-none',
-            visualBlurLevel > 0 ? getVisualBlurClass(visualBlurLevel) : null,
-          )}
-        >
-          <TabNavigation />
-        </div>
+        <TabNavigation />
 
-        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-12 pt-4 sm:px-6 sm:pt-6">
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-3 pb-24 pt-3 sm:px-6 sm:pt-6 lg:pb-12">
           <AmaterasuPenaltyBanner />
 
           <AnimatePresence mode="wait">

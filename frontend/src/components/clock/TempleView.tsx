@@ -540,7 +540,7 @@ export function TempleView({
       ref={labDrawerRef}
       onMouseEnter={() => setIsLabHovered(true)}
       onMouseLeave={() => setIsLabHovered(false)}
-      className="fixed bottom-5 right-5 z-40"
+      className="fixed bottom-20 right-3 z-40 sm:right-5 lg:bottom-5"
     >
       <AnimatePresence>
         {isLabOpen && (
@@ -564,7 +564,7 @@ export function TempleView({
               ease: [0.16, 1, 0.3, 1],
               type: 'tween',
             }}
-            className="absolute bottom-[calc(100%+0.6rem)] right-0 w-[320px] rounded-2xl border border-white/10 bg-black/80 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.95)] backdrop-blur-2xl sm:w-[380px]"
+            className="absolute bottom-[calc(100%+0.6rem)] right-0 w-[calc(100vw-1.5rem)] max-w-[380px] rounded-2xl border border-white/10 bg-black/80 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.95)] backdrop-blur-2xl"
           >
             {/* Invisible hover bridge between floating button and drawer */}
             <div
@@ -729,7 +729,7 @@ export function TempleView({
           }
         }}
         className={cn(
-          'inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-black/65 px-4 py-2 text-xs font-medium text-zinc-100 shadow-[0_16px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl transition-colors duration-700 hover:border-white/25',
+          'inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-black/65 px-3 py-2 text-xs font-medium text-zinc-100 shadow-[0_16px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl transition-colors duration-700 hover:border-white/25 sm:px-4',
           isLabOpen &&
             'border-[var(--chakra-primary,#DC2626)]/60 shadow-[0_16px_40px_rgba(0,0,0,0.85),0_0_20px_var(--chakra-glow,rgba(220,38,38,0.32))]',
         )}
@@ -739,7 +739,8 @@ export function TempleView({
           style={{ color: 'var(--chakra-primary, #DC2626)' }}
           aria-hidden="true"
         />
-        <span className="whitespace-nowrap">Lab Uchiha Beta</span>
+        <span className="whitespace-nowrap sm:hidden">Lab Beta</span>
+        <span className="hidden whitespace-nowrap sm:inline">Lab Uchiha Beta</span>
       </button>
     </div>
   );
@@ -992,7 +993,7 @@ export function TempleView({
       {/* Bottom Stage: Unified Horizontal Command Dock */}
       <div
         className={cn(
-          'relative z-20 w-full max-w-4xl pb-14 transition-opacity duration-500 lg:pb-2',
+          'relative z-20 w-full max-w-4xl pb-20 transition-opacity duration-500 lg:pb-2',
           isTsukuyomiMode && status === 'running' && 'opacity-85 hover:opacity-100',
         )}
       >

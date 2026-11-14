@@ -3,29 +3,44 @@
 import { useEffect } from 'react';
 import { formatTimerClock } from '@/lib/date';
 import { useTsukuyomiStore } from '@/store/useTsukuyomiStore';
+import type { TsukuyomiStore } from '@/types/tsukuyomi';
 
 const BASE_DOCUMENT_TITLE = 'Tsukuyomi Focus';
 
+function syncDocumentTitle(state: TsukuyomiStore): void {
+  const { status, mode, remainingSeconds, activeMissionId } = state.timer;
+
+  if (status === 'idle') {
+    document.title = BASE_DOCUMENT_TITLE;
+    return;
+  }
+
+  const formattedTime = formatTimerClock(remainingSeconds);
+
+  if (status === 'paused') {
+    document.title = `(${formattedTime}) Pausado — ${BASE_DOCUMENT_TITLE}`;
+    return;
+  }
+
+  if (mode === 'focus') {
+    const activeMission = activeMissionId
+      ? state.missions.find((mission) => mission.id === activeMissionId)
+      : undefined;
+    const targetSuffix = activeMission
+      ? `Missão Rank ${activeMission.rank}`
+      : 'Treino Livre';
+    document.title = `(${formattedTime}) Tsukuyomi Ativo — ${targetSuffix}`;
+  } else {
+    document.title = `(${formattedTime}) Repouso Ocular — ${BASE_DOCUMENT_TITLE}`;
+  }
+}
+
 /**
  * Anti-throttling timer loop driven by targetEndTime + visibilitychange/focus listeners,
- * keeping document.title synchronized in real time.
+ * updating document.title imperatively via store subscription to avoid root re-renders.
  */
 export function useFocusTimer(): void {
   const status = useTsukuyomiStore((state) => state.timer.status);
-  const mode = useTsukuyomiStore((state) => state.timer.mode);
-  const remainingSeconds = useTsukuyomiStore(
-    (state) => state.timer.remainingSeconds,
-  );
-  const activeMissionId = useTsukuyomiStore(
-    (state) => state.timer.activeMissionId,
-  );
-  const activeMissionLabel = useTsukuyomiStore((state) => {
-    if (!state.timer.activeMissionId) return null;
-    const mission = state.missions.find(
-      (m) => m.id === state.timer.activeMissionId,
-    );
-    return mission ? `Missão Rank ${mission.rank}` : null;
-  });
   const syncTimerTick = useTsukuyomiStore((state) => state.syncTimerTick);
 
   useEffect(() => {
@@ -38,7 +53,9 @@ export function useFocusTimer(): void {
     };
 
     handleSync();
-    const intervalId = window.setInterval(handleSync, 250);
+    const intervalId = window.setInterval(() => {
+      syncTimerTick(Date.now());
+    }, 1000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -57,28 +74,22 @@ export function useFocusTimer(): void {
   }, [status, syncTimerTick]);
 
   useEffect(() => {
-    if (status === 'idle') {
-      document.title = BASE_DOCUMENT_TITLE;
-      return;
-    }
+    syncDocumentTitle(useTsukuyomiStore.getState());
 
-    const formattedTime = formatTimerClock(remainingSeconds);
+    const unsubscribe = useTsukuyomiStore.subscribe((state, prevState) => {
+      if (
+        state.timer.remainingSeconds !== prevState.timer.remainingSeconds ||
+        state.timer.status !== prevState.timer.status ||
+        state.timer.mode !== prevState.timer.mode ||
+        state.timer.activeMissionId !== prevState.timer.activeMissionId ||
+        state.missions !== prevState.missions
+      ) {
+        syncDocumentTitle(state);
+      }
+    });
 
-    if (status === 'paused') {
-      document.title = `(${formattedTime}) Pausado — ${BASE_DOCUMENT_TITLE}`;
-      return;
-    }
-
-    if (mode === 'focus') {
-      const targetSuffix = activeMissionLabel ?? 'Treino Livre';
-      document.title = `(${formattedTime}) Tsukuyomi Ativo — ${targetSuffix}`;
-    } else {
-      document.title = `(${formattedTime}) Repouso Ocular — ${BASE_DOCUMENT_TITLE}`;
-    }
-  }, [status, mode, remainingSeconds, activeMissionId, activeMissionLabel]);
-
-  useEffect(() => {
     return () => {
+      unsubscribe();
       document.title = BASE_DOCUMENT_TITLE;
     };
   }, []);

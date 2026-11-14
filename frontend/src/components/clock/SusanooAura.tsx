@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { memo, useEffect, useRef, type CSSProperties } from 'react';
 import Image from 'next/image';
 import {
   AnimatePresence,
@@ -52,40 +52,35 @@ const SUSANOO_PALETTES: Record<MangekyouVariant, SusanooPalette> = {
     secondary: '#991B1B',
     highlight: '#FCA5A5',
     glowRgba: 'rgba(220, 38, 38, 0.58)',
-    cssTintFilter:
-      'hue-rotate(-2deg) saturate(1.22) brightness(1.06) drop-shadow(0 0 22px rgba(220, 38, 38, 0.58))',
+    cssTintFilter: 'hue-rotate(-2deg) saturate(1.22) brightness(1.06)',
   },
   sasuke: {
     primary: '#8B5CF6',
     secondary: '#6D28D9',
     highlight: '#DDD6FE',
     glowRgba: 'rgba(139, 92, 246, 0.58)',
-    cssTintFilter:
-      'hue-rotate(266deg) saturate(1.36) brightness(1.08) drop-shadow(0 0 22px rgba(139, 92, 246, 0.58))',
+    cssTintFilter: 'hue-rotate(266deg) saturate(1.36) brightness(1.08)',
   },
   shisui: {
     primary: '#10B981',
     secondary: '#059669',
     highlight: '#A7F3D0',
     glowRgba: 'rgba(16, 185, 129, 0.54)',
-    cssTintFilter:
-      'hue-rotate(146deg) saturate(1.24) brightness(1.02) drop-shadow(0 0 20px rgba(16, 185, 129, 0.54))',
+    cssTintFilter: 'hue-rotate(146deg) saturate(1.24) brightness(1.02)',
   },
   madara: {
     primary: '#2563EB',
     secondary: '#1D4ED8',
     highlight: '#BFDBFE',
     glowRgba: 'rgba(37, 99, 235, 0.58)',
-    cssTintFilter:
-      'hue-rotate(222deg) saturate(1.42) brightness(1.1) drop-shadow(0 0 22px rgba(37, 99, 235, 0.58))',
+    cssTintFilter: 'hue-rotate(222deg) saturate(1.42) brightness(1.1)',
   },
   obito: {
     primary: '#0EA5E9',
     secondary: '#0284C7',
     highlight: '#BAE6FD',
     glowRgba: 'rgba(14, 165, 233, 0.56)',
-    cssTintFilter:
-      'hue-rotate(199deg) saturate(1.32) brightness(1.1) drop-shadow(0 0 22px rgba(14, 165, 233, 0.56))',
+    cssTintFilter: 'hue-rotate(199deg) saturate(1.32) brightness(1.1)',
   },
 };
 
@@ -124,8 +119,8 @@ const OUTER_EDGE_DISSOLVE_STYLE: CSSProperties = {
 
 const SUSANOO_CANVAS_SIZE = 560;
 const SUSANOO_CANVAS_CENTER = SUSANOO_CANVAS_SIZE / 2;
-const SUSANOO_SPARK_COUNT = 36;
-const SUSANOO_ARC_COUNT = 5;
+const SUSANOO_SPARK_COUNT = 12;
+const SUSANOO_ARC_COUNT = 3;
 const SUSANOO_FADE_RADIUS = 255;
 
 interface ChakraSpark {
@@ -262,7 +257,7 @@ function MaskedSusanooAsset({
 }: MaskedSusanooAssetProps) {
   const imageNode = (
     <div
-      className="absolute inset-0 mix-blend-screen"
+      className="absolute inset-0 mix-blend-screen will-change-transform transform-gpu"
       style={{ filter: filterCss, opacity }}
     >
       <Image
@@ -430,7 +425,7 @@ function SusanooStageLayers({
   const assetSrc = SUSANOO_PHASE_ASSETS[effectiveStage];
   const frameConfig = STAGE_FRAME_CONFIG[effectiveStage];
   const bodyFilter = `url(#susanoo-flame-warp) ${palette.cssTintFilter}`;
-  const auraFilter = `url(#susanoo-flame-warp) blur(2px) ${palette.cssTintFilter}`;
+  const auraFilter = `url(#susanoo-flame-warp) ${palette.cssTintFilter}`;
 
   const breathDuration = isRunning ? 3.1 : 4.6;
   const flankFloatDuration = isRunning ? 3.3 : 4.8;
@@ -489,30 +484,14 @@ function SusanooStageLayers({
         />
       )}
 
-      {/* Ambient Variant-Tinted Spiritual Halo */}
-      <motion.div
-        animate={
-          reducedMotion
-            ? { opacity: 0.52, scale: 1 }
-            : {
-                opacity: [0.42, 0.72, 0.42],
-                scale: [0.97, 1.04, 0.97],
-              }
-        }
-        transition={
-          reducedMotion
-            ? { duration: 0.2 }
-            : {
-                type: 'tween',
-                ease: 'easeInOut',
-                duration: isRunning ? 2.8 : 4.2,
-                repeat: Infinity,
-              }
-        }
+      {/* Static Ambient Variant-Tinted Spiritual Halo behind Susanoo Armor */}
+      <div
+        aria-hidden="true"
         style={{
+          opacity: isRunning ? 0.68 : 0.48,
           background: `radial-gradient(circle at center, ${palette.glowRgba} 0%, ${palette.secondary}26 42%, transparent 74%)`,
         }}
-        className="pointer-events-none absolute inset-4 rounded-full mix-blend-screen will-change-transform"
+        className="pointer-events-none absolute inset-4 rounded-full mix-blend-screen"
       />
 
       {/* Scaled Anatomically-Aligned Susano'o Stage Framing OcularClock */}
@@ -870,7 +849,30 @@ function SusanooStageLayers({
   );
 }
 
-export function SusanooAura({
+function areSusanooPropsEqual(
+  prev: SusanooAuraProps,
+  next: SusanooAuraProps,
+): boolean {
+  if (
+    prev.enabled !== next.enabled ||
+    prev.isRunning !== next.isRunning ||
+    prev.variant !== next.variant ||
+    prev.stageOverride !== next.stageOverride ||
+    prev.className !== next.className
+  ) {
+    return false;
+  }
+
+  if (!prev.enabled && !next.enabled) {
+    return true;
+  }
+
+  const prevPhase = getSusanooPhase(Math.max(0, Math.min(100, prev.progress)));
+  const nextPhase = getSusanooPhase(Math.max(0, Math.min(100, next.progress)));
+  return prevPhase === nextPhase;
+}
+
+export const SusanooAura = memo(function SusanooAura({
   progress,
   enabled,
   isRunning = false,
@@ -934,10 +936,13 @@ export function SusanooAura({
       return;
     }
 
-    const sparks: ChakraSpark[] = Array.from({ length: SUSANOO_SPARK_COUNT }, () =>
+    const activeSparkCount = window.innerWidth < 768 ? 6 : SUSANOO_SPARK_COUNT;
+    const activeArcCount = window.innerWidth < 768 ? 2 : SUSANOO_ARC_COUNT;
+
+    const sparks: ChakraSpark[] = Array.from({ length: activeSparkCount }, () =>
       createChakraSpark(true),
     );
-    const arcs: ChakraArc[] = Array.from({ length: SUSANOO_ARC_COUNT }, () =>
+    const arcs: ChakraArc[] = Array.from({ length: activeArcCount }, () =>
       createChakraArc(true),
     );
 
@@ -958,8 +963,7 @@ export function SusanooAura({
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      // 1. Rising Chakra Sparks (fagulhas)
-      ctx.shadowBlur = 8;
+      // 1. Rising Chakra Sparks (fagulhas, GPU-safe without shadowBlur)
       for (let i = 0; i < sparks.length; i += 1) {
         const spark = sparks[i];
         spark.age += dt * speedMult;
@@ -992,7 +996,6 @@ export function SusanooAura({
           ? currentPalette.highlight
           : currentPalette.primary;
 
-        ctx.shadowColor = currentPalette.primary;
         ctx.strokeStyle = currentPalette.primary;
         ctx.lineWidth = Math.max(0.8, spark.size * 0.72);
         ctx.globalAlpha = alpha * 0.6;
@@ -1088,18 +1091,14 @@ export function SusanooAura({
           ctx.lineTo(branchEndX, branchEndY);
         };
 
-        // Outer electric glow
-        ctx.shadowColor = currentPalette.primary;
-        ctx.shadowBlur = 14;
+        // Outer electric stroke
         ctx.strokeStyle = currentPalette.primary;
-        ctx.lineWidth = 2.2;
-        ctx.globalAlpha = arcAlpha * 0.85;
+        ctx.lineWidth = 2.4;
+        ctx.globalAlpha = arcAlpha * 0.72;
         traceArcPath();
         ctx.stroke();
 
         // Inner high-voltage highlight core
-        ctx.shadowColor = currentPalette.highlight;
-        ctx.shadowBlur = 6;
         ctx.strokeStyle = currentPalette.highlight;
         ctx.lineWidth = 0.95;
         ctx.globalAlpha = arcAlpha;
@@ -1107,7 +1106,6 @@ export function SusanooAura({
         ctx.stroke();
       }
 
-      ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
       rafId = window.requestAnimationFrame(tick);
     };
@@ -1330,4 +1328,4 @@ export function SusanooAura({
       )}
     </AnimatePresence>
   );
-}
+}, areSusanooPropsEqual);

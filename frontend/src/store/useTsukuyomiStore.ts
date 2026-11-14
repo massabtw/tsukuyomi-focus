@@ -1,7 +1,11 @@
 'use client';
 
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import {
+  createJSONStorage,
+  persist,
+  type StateStorage,
+} from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 import { EYE_STAGE_MAP } from '@/constants/evolution';
 import {
@@ -9,6 +13,24 @@ import {
   RANK_DEFINITIONS,
 } from '@/constants/ranks';
 import { createInitialSeedState } from '@/constants/seed';
+import {
+  abandonBackendSession,
+  completeBackendSession,
+  createBackendMission,
+  deleteBackendMission,
+  fetchFullState,
+  generateAiSharingan,
+  isValidGuid,
+  patchBackendMissionStatus,
+  patchEyeCustomization,
+  postDevSimulate,
+  toggleBackendMissionAmaterasu,
+  updateBackendMission,
+  type ApiFocusSessionLogDto,
+  type ApiIzanagiDto,
+  type ApiMissionDto,
+  type ApiProfileDto,
+} from '@/lib/apiClient';
 import { audioEngine } from '@/lib/audioEngine';
 import {
   addDays,
@@ -32,6 +54,8 @@ import type {
   CustomEyeConfig,
   EyeStage,
   FocusSessionLog,
+  GeneratedSharinganLore,
+  GenerateSharinganInput,
   IzanagiTriggerContext,
   MangekyouVariant,
   Mission,
@@ -50,6 +74,82 @@ function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function runBackendSync(task: () => Promise<void>): void {
+  void task().catch(() => {
+    // Graceful offline fallback when backend API is unavailable
+  });
+}
+
+function mapApiMission(dto: ApiMissionDto): Mission {
+  return {
+    id: dto.id,
+    title: dto.title,
+    description: dto.description ?? '',
+    rank: dto.rank,
+    status: dto.status,
+    estimatedMinutes: dto.estimatedMinutes,
+    completedMinutes: dto.completedMinutes,
+    isAmaterasu: dto.isAmaterasu,
+    amaterasuDate: dto.amaterasuDate,
+    createdAt: dto.createdAt,
+    completedAt: dto.completedAt,
+  };
+}
+
+function mapApiLog(dto: ApiFocusSessionLogDto): FocusSessionLog {
+  return {
+    id: dto.id,
+    missionId: dto.missionId,
+    missionTitle: dto.missionTitle ?? 'Treino Livre no Tsukuyomi',
+    rank: dto.rank ?? 'D',
+    durationMinutes: dto.durationMinutes,
+    chakraEarned: dto.chakraEarned,
+    wasCompleted: dto.wasCompleted,
+    usedSusanoo: dto.wasSusanooActive,
+    isAmaterasu: false,
+    timestamp: dto.timestamp,
+    date: dto.date,
+  };
+}
+
+function clampVisualBlur(level: number): VisualBlurLevel {
+  return Math.max(0, Math.min(3, Math.round(level))) as VisualBlurLevel;
+}
+
+function mapApiProfilePatch(
+  profile: ApiProfileDto,
+  currentCustomEye: CustomEyeConfig,
+  izanagi?: ApiIzanagiDto,
+): Partial<TsukuyomiState> {
+  const hasCustomImage = Boolean(profile.customEyeImageUrl);
+  const patch: Partial<TsukuyomiState> = {
+    chakra: profile.totalChakra,
+    currentEyeStage: profile.currentEyeStage,
+    equippedEyeStage: profile.equippedEyeStage,
+    mangekyouVariant: profile.mangekyouVariant,
+    visualBlurLevel: clampVisualBlur(profile.visualBlurLevel),
+    streak: profile.currentStreak,
+    longestStreak: profile.bestStreak,
+    lastFocusDate: profile.lastFocusDate,
+    customEye: {
+      ...currentCustomEye,
+      imageDataUrl: profile.customEyeImageUrl,
+      enabled: hasCustomImage ? true : currentCustomEye.enabled && hasCustomImage,
+    },
+  };
+
+  if (izanagi) {
+    patch.izanagi = {
+      leftEyeBlind: izanagi.leftEyeBlind,
+      rightEyeBlind: izanagi.rightEyeBlind,
+      restorationProgressMinutes: izanagi.restorationProgressMinutes,
+      totalTimesUsed: izanagi.totalTimesUsed,
+    };
+  }
+
+  return patch;
+}
+
 function getDefaultDurationSecondsForMode(
   mode: TimerMode,
   activeMission: Mission | undefined,
@@ -64,6 +164,29 @@ function getDefaultDurationSecondsForMode(
 
 const PERSIST_STORAGE_KEY = 'tsukuyomi-focus-storage';
 const PERSIST_VERSION = 2;
+
+function createDeduplicatedStorage(): StateStorage {
+  let lastPersistedValue: string | null = null;
+  return {
+    getItem: (name: string) => {
+      if (typeof window === 'undefined') return null;
+      const value = window.localStorage.getItem(name);
+      lastPersistedValue = value;
+      return value;
+    },
+    setItem: (name: string, value: string) => {
+      if (typeof window === 'undefined') return;
+      if (value === lastPersistedValue) return;
+      lastPersistedValue = value;
+      window.localStorage.setItem(name, value);
+    },
+    removeItem: (name: string) => {
+      if (typeof window === 'undefined') return;
+      lastPersistedValue = null;
+      window.localStorage.removeItem(name);
+    },
+  };
+}
 
 export const useTsukuyomiStore = create<TsukuyomiStore>()(
   persist(
@@ -391,6 +514,34 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             susanooEnabled: false,
           },
         });
+
+        runBackendSync(async () => {
+          const response = await completeBackendSession({
+            missionId: isValidGuid(activeMission?.id) ? activeMission.id : null,
+            durationMinutes,
+            wasSusanooActive: usedSusanoo,
+            markMissionCompleted: false,
+          });
+          const syncedLog = mapApiLog(response.session);
+          const syncedMission = response.updatedMission
+            ? mapApiMission(response.updatedMission)
+            : null;
+
+          set((curr) => ({
+            backendConnected: true,
+            ...mapApiProfilePatch(response.profile, curr.customEye, response.izanagi),
+            missions: syncedMission
+              ? curr.missions.map((m) => (m.id === syncedMission.id ? syncedMission : m))
+              : curr.missions,
+            sessionLogs: [
+              syncedLog,
+              ...curr.sessionLogs.filter((l) => l.id !== newLog.id && l.id !== syncedLog.id),
+            ],
+            pendingAwakening: response.unlockedNewEyeStage && response.newEyeStage
+              ? response.newEyeStage
+              : curr.pendingAwakening,
+          }));
+        });
       },
 
       abandonActiveCycle: (options?: { useIzanagi?: boolean }) => {
@@ -410,6 +561,16 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           return;
         }
 
+        const activeMissionForIzanagi = state.missions.find(
+          (m) => m.id === state.timer.activeMissionId,
+        );
+        const elapsedForIzanagi = Math.max(
+          0,
+          Math.floor(
+            (state.timer.durationSeconds - state.timer.remainingSeconds) / 60,
+          ),
+        );
+
         if (options?.useIzanagi && canInvokeIzanagi(state.izanagi)) {
           const nextIzanagi = blindNextHealthyEye(state.izanagi);
           if (nextIzanagi) {
@@ -424,6 +585,21 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
                 targetEndTime: null,
                 susanooEnabled: false,
               },
+            });
+
+            runBackendSync(async () => {
+              const response = await abandonBackendSession({
+                missionId: isValidGuid(activeMissionForIzanagi?.id)
+                  ? activeMissionForIzanagi.id
+                  : null,
+                durationMinutesElapsed: elapsedForIzanagi,
+                wasSusanooActive: state.timer.susanooEnabled,
+                useIzanagiToPreventPenalty: true,
+              });
+              set((curr) => ({
+                backendConnected: true,
+                ...mapApiProfilePatch(response.profile, curr.customEye, response.izanagi),
+              }));
             });
             return;
           }
@@ -467,6 +643,24 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             susanooEnabled: false,
           },
         });
+
+        runBackendSync(async () => {
+          const response = await abandonBackendSession({
+            missionId: isValidGuid(activeMission?.id) ? activeMission.id : null,
+            durationMinutesElapsed: elapsedMinutes,
+            wasSusanooActive: state.timer.susanooEnabled,
+            useIzanagiToPreventPenalty: false,
+          });
+          const syncedLog = mapApiLog(response.session);
+          set((curr) => ({
+            backendConnected: true,
+            ...mapApiProfilePatch(response.profile, curr.customEye, response.izanagi),
+            sessionLogs: [
+              syncedLog,
+              ...curr.sessionLogs.filter((l) => l.id !== abandonedLog.id && l.id !== syncedLog.id),
+            ],
+          }));
+        });
       },
 
       addMission: (input: CreateMissionInput): Mission => {
@@ -500,6 +694,32 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           missions: [mission, ...curr.missions],
         }));
 
+        runBackendSync(async () => {
+          const created = await createBackendMission({
+            title: mission.title,
+            description: mission.description,
+            rank: mission.rank,
+            estimatedMinutes: mission.estimatedMinutes,
+            isAmaterasu: mission.isAmaterasu,
+          });
+          const finalDto =
+            mission.status !== 'todo'
+              ? await patchBackendMissionStatus(created.id, mission.status)
+              : created;
+          const syncedMission = mapApiMission(finalDto);
+
+          set((curr) => ({
+            backendConnected: true,
+            missions: curr.missions.map((m) =>
+              m.id === mission.id ? syncedMission : m,
+            ),
+            timer:
+              curr.timer.activeMissionId === mission.id
+                ? { ...curr.timer, activeMissionId: syncedMission.id }
+                : curr.timer,
+          }));
+        });
+
         return mission;
       },
 
@@ -512,6 +732,25 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             m.id === id ? { ...m, ...patch } : m,
           ),
         }));
+
+        if (isValidGuid(id)) {
+          const updated = get().missions.find((m) => m.id === id);
+          if (updated) {
+            runBackendSync(async () => {
+              const dto = await updateBackendMission(id, {
+                title: updated.title,
+                description: updated.description,
+                rank: updated.rank,
+                estimatedMinutes: updated.estimatedMinutes,
+              });
+              const synced = mapApiMission(dto);
+              set((curr) => ({
+                backendConnected: true,
+                missions: curr.missions.map((m) => (m.id === id ? synced : m)),
+              }));
+            });
+          }
+        }
       },
 
       deleteMission: (id: string) => {
@@ -522,6 +761,13 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
               ? { ...state.timer, activeMissionId: null }
               : state.timer,
         }));
+
+        if (isValidGuid(id)) {
+          runBackendSync(async () => {
+            await deleteBackendMission(id);
+            set({ backendConnected: true });
+          });
+        }
       },
 
       moveMission: (
@@ -557,6 +803,13 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
 
           return { missions: [updatedMission, ...remaining] };
         });
+
+        if (isValidGuid(id)) {
+          runBackendSync(async () => {
+            await patchBackendMissionStatus(id, targetStatus);
+            set({ backendConnected: true });
+          });
+        }
       },
 
       reorderMissionsInColumn: (
@@ -601,6 +854,12 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
               m.id === id ? { ...m, isAmaterasu: false, amaterasuDate: null } : m,
             ),
           });
+          if (isValidGuid(id)) {
+            runBackendSync(async () => {
+              await toggleBackendMissionAmaterasu(id, false);
+              set({ backendConnected: true });
+            });
+          }
           return { ok: true };
         }
 
@@ -627,6 +886,12 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             m.id === id ? { ...m, isAmaterasu: true, amaterasuDate: today } : m,
           ),
         });
+        if (isValidGuid(id)) {
+          runBackendSync(async () => {
+            await toggleBackendMissionAmaterasu(id, true);
+            set({ backendConnected: true });
+          });
+        }
         return { ok: true };
       },
 
@@ -669,6 +934,13 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
                 },
           };
         });
+
+        if (isValidGuid(id)) {
+          runBackendSync(async () => {
+            await patchBackendMissionStatus(id, 'in_tsukuyomi');
+            set({ backendConnected: true });
+          });
+        }
       },
 
       setActiveMission: (id: string | null) => {
@@ -824,6 +1096,11 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           equippedEyeStage: stage,
           ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
         });
+
+        runBackendSync(async () => {
+          await patchEyeCustomization({ equippedEyeStage: stage });
+          set({ backendConnected: true });
+        });
       },
 
       setMangekyouVariant: (variant: MangekyouVariant) => {
@@ -843,6 +1120,11 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         set({
           mangekyouVariant: variant,
           ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
+        });
+
+        runBackendSync(async () => {
+          await patchEyeCustomization({ mangekyouVariant: variant });
+          set({ backendConnected: true });
         });
       },
 
@@ -876,6 +1158,137 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             ...patch,
           },
         }));
+
+        if (patch.imageDataUrl !== undefined || patch.enabled !== undefined) {
+          const nextCustomEye = get().customEye;
+          const shouldClear =
+            patch.imageDataUrl === null || patch.enabled === false;
+          runBackendSync(async () => {
+            await patchEyeCustomization({
+              customEyeImageUrl: shouldClear ? null : nextCustomEye.imageDataUrl,
+              clearCustomEyeImage: shouldClear,
+            });
+            set({ backendConnected: true });
+          });
+        }
+      },
+
+      syncFromBackend: async () => {
+        try {
+          const remote = await fetchFullState();
+          const remoteMissions = remote.missions.map(mapApiMission);
+          const remoteLogs = remote.recentLogs.map(mapApiLog);
+
+          set((state) => {
+            const currentActiveExists =
+              state.timer.activeMissionId !== null &&
+              remoteMissions.some((m) => m.id === state.timer.activeMissionId);
+
+            const nextActiveMission = currentActiveExists
+              ? (remoteMissions.find((m) => m.id === state.timer.activeMissionId) ?? null)
+              : (remoteMissions.find((m) => m.status === 'in_tsukuyomi') ?? null);
+
+            const shouldResetIdleDuration =
+              state.timer.status === 'idle' &&
+              state.timer.mode === 'focus' &&
+              !currentActiveExists &&
+              nextActiveMission !== null;
+
+            const nextDurationSeconds =
+              shouldResetIdleDuration && nextActiveMission
+                ? Math.max(1, nextActiveMission.estimatedMinutes) * 60
+                : state.timer.durationSeconds;
+
+            const nextPenalty =
+              remote.amaterasuPenaltyApplied && remote.amaterasuPenaltyChakra > 0
+                ? {
+                    missionId: 'amaterasu-daily-check',
+                    missionTitle:
+                      remote.expiredAmaterasuMissions[0] ??
+                      'Missão Amaterasu expirada',
+                    chakraLost: remote.amaterasuPenaltyChakra,
+                    failedDate: formatLocalDate(),
+                  }
+                : state.pendingAmaterasuPenalty;
+
+            return {
+              backendConnected: true,
+              ...mapApiProfilePatch(remote.profile, state.customEye, remote.izanagi),
+              missions: remoteMissions,
+              sessionLogs: remoteLogs,
+              pendingAmaterasuPenalty: nextPenalty,
+              timer: {
+                ...state.timer,
+                activeMissionId: nextActiveMission?.id ?? null,
+                durationSeconds: nextDurationSeconds,
+                remainingSeconds: shouldResetIdleDuration
+                  ? nextDurationSeconds
+                  : state.timer.remainingSeconds,
+              },
+            };
+          });
+        } catch {
+          set({ backendConnected: false });
+        }
+      },
+
+      generateCustomSharinganWithAi: async (
+        input: GenerateSharinganInput,
+      ): Promise<GeneratedSharinganLore> => {
+        set({ isGeneratingSharingan: true });
+        try {
+          const state = get();
+          const styleVariant = input.styleVariant ?? state.mangekyouVariant;
+          const outputFormat = input.outputFormat ?? 'svg';
+          const autoEquip = input.autoEquip ?? true;
+
+          const response = await generateAiSharingan({
+            prompt: input.prompt?.trim() || undefined,
+            baseEyeImageBase64: input.baseEyeImageBase64 ?? null,
+            styleVariant,
+            outputFormat,
+            autoEquip,
+          });
+
+          const lore: GeneratedSharinganLore = {
+            doujutsuName: response.doujutsuName,
+            loreDescription: response.loreDescription,
+            rawSvgCode: response.rawSvgCode,
+            svgDataUri: response.svgDataUri,
+            rasterImageUrl: response.rasterImageUrl,
+            primaryGlowColor: response.primaryGlowColor,
+            equippedImageUrl: response.equippedImageUrl,
+            outputFormat,
+          };
+
+          void audioEngine.play('mangekyou-awaken');
+
+          set((curr) => {
+            const nextCustomEye: CustomEyeConfig = autoEquip
+              ? {
+                  ...curr.customEye,
+                  enabled: true,
+                  imageDataUrl: response.equippedImageUrl,
+                }
+              : curr.customEye;
+
+            const profilePatch = response.profile
+              ? mapApiProfilePatch(response.profile, nextCustomEye)
+              : {};
+
+            return {
+              ...profilePatch,
+              backendConnected: true,
+              lastGeneratedSharingan: lore,
+              customEye: nextCustomEye,
+              ocularSpinBurstNonce: curr.ocularSpinBurstNonce + 1,
+            };
+          });
+
+          return lore;
+        } finally {
+          set({ isGeneratingSharingan: false });
+        }
       },
 
       updateAudioSettings: (patch: Partial<AudioSettings>) => {
@@ -914,6 +1327,14 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
               : state.pendingAwakening,
           };
         });
+
+        runBackendSync(async () => {
+          const remote = await postDevSimulate({ addChakra: amount });
+          set((curr) => ({
+            backendConnected: true,
+            ...mapApiProfilePatch(remote.profile, curr.customEye, remote.izanagi),
+          }));
+        });
       },
 
       devUnlockAllEyes: () => {
@@ -925,6 +1346,14 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             equippedEyeStage: 'rinnegan',
             pendingAwakening: 'rinnegan',
           };
+        });
+
+        runBackendSync(async () => {
+          const remote = await postDevSimulate({ unlockAllEyes: true });
+          set((curr) => ({
+            backendConnected: true,
+            ...mapApiProfilePatch(remote.profile, curr.customEye, remote.izanagi),
+          }));
         });
       },
 
@@ -957,6 +1386,19 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           },
           izanagiFlashNonce: state.izanagiFlashNonce + 1,
         }));
+
+        const nextIzanagi = get().izanagi;
+        runBackendSync(async () => {
+          const remote = await postDevSimulate(
+            eye === 'left'
+              ? { simulateLeftEyeBlind: nextIzanagi.leftEyeBlind }
+              : { simulateRightEyeBlind: nextIzanagi.rightEyeBlind },
+          );
+          set((curr) => ({
+            backendConnected: true,
+            ...mapApiProfilePatch(remote.profile, curr.customEye, remote.izanagi),
+          }));
+        });
       },
 
       devSimulateDayTurnWithAmaterasu: () => {
@@ -1003,7 +1445,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
     {
       name: PERSIST_STORAGE_KEY,
       version: PERSIST_VERSION,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createDeduplicatedStorage()),
       partialize: (
         state,
       ): Omit<
@@ -1012,6 +1454,8 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         | 'izanagiFlashNonce'
         | 'tsukuyomiCastNonce'
         | 'ocularSpinBurstNonce'
+        | 'backendConnected'
+        | 'isGeneratingSharingan'
       > => ({
         activeTab: state.activeTab,
         chakra: state.chakra,
@@ -1031,10 +1475,17 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         sessionLogs: state.sessionLogs,
         customEye: state.customEye,
         audio: state.audio,
-        timer: state.timer,
+        timer: {
+          ...state.timer,
+          remainingSeconds:
+            state.timer.status === 'running'
+              ? state.timer.durationSeconds
+              : state.timer.remainingSeconds,
+        },
         pendingAwakening: state.pendingAwakening,
         pendingAmaterasuPenalty: state.pendingAmaterasuPenalty,
         pendingIzanagiRescue: state.pendingIzanagiRescue,
+        lastGeneratedSharingan: state.lastGeneratedSharingan,
       }),
       migrate: (persistedState: unknown, version: number) => {
         const base = createInitialSeedState();
@@ -1049,13 +1500,18 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             isBetaFullAccess: true,
             susanooStageOverride: 'auto' as const,
             currentEyeStage: 'rinnegan' as const,
+            lastGeneratedSharingan: incoming.lastGeneratedSharingan ?? null,
             izanagi: { ...base.izanagi, ...(incoming.izanagi ?? {}) },
             customEye: { ...base.customEye, ...(incoming.customEye ?? {}) },
             audio: { ...base.audio, ...(incoming.audio ?? {}) },
             timer: { ...base.timer, ...(incoming.timer ?? {}) },
           };
         }
-        return base;
+        return {
+          ...base,
+          ...incoming,
+          lastGeneratedSharingan: incoming.lastGeneratedSharingan ?? null,
+        };
       },
       onRehydrateStorage: () => (rehydratedState) => {
         if (!rehydratedState) return;

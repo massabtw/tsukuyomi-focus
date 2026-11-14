@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -35,6 +35,7 @@ import { MissionCard } from '@/components/kanban/MissionCard';
 import { NewMissionModal } from '@/components/kanban/NewMissionModal';
 import { RANK_DEFINITIONS, RANK_ORDER } from '@/constants/ranks';
 import { audioEngine } from '@/lib/audioEngine';
+import { cn } from '@/lib/cn';
 import { formatLocalDate } from '@/lib/date';
 import { sortMissionsAmaterasuFirst } from '@/lib/gamification';
 import { useTsukuyomiStore } from '@/store/useTsukuyomiStore';
@@ -107,6 +108,8 @@ export function KanbanBoard() {
   );
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [activeMobileColumn, setActiveMobileColumn] =
+    useState<MissionStatus>('todo');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDefaultStatus, setModalDefaultStatus] =
     useState<MissionStatus>('todo');
@@ -177,20 +180,23 @@ export function KanbanBoard() {
       m.amaterasuDate === today,
   );
 
-  function openNewMissionModal(status: MissionStatus = 'todo') {
+  const openNewMissionModal = useCallback((status: MissionStatus = 'todo') => {
     setModalDefaultStatus(status);
     setModalOpen(true);
-  }
+  }, []);
 
-  function handleToggleAmaterasu(id: string) {
-    const result = toggleMissionAmaterasu(id);
-    if (!result.ok && result.reason) {
-      audioEngine.playClick();
-      setAmaterasuNotice(result.reason);
-    } else {
-      setAmaterasuNotice(null);
-    }
-  }
+  const handleToggleAmaterasu = useCallback(
+    (id: string) => {
+      const result = toggleMissionAmaterasu(id);
+      if (!result.ok && result.reason) {
+        audioEngine.playClick();
+        setAmaterasuNotice(result.reason);
+      } else {
+        setAmaterasuNotice(null);
+      }
+    },
+    [toggleMissionAmaterasu],
+  );
 
   function handleCtaPointerEnter() {
     audioEngine.playHover();
@@ -505,6 +511,55 @@ export function KanbanBoard() {
           )}
         </AnimatePresence>
 
+        {/* Mobile Column Selector (< lg) */}
+        <div
+          role="tablist"
+          aria-label="Selecionar coluna de missões"
+          className="grid grid-cols-3 gap-1.5 rounded-2xl border border-white/[0.08] bg-[#0B0B0F]/95 p-1.5 lg:hidden"
+        >
+          {(
+            [
+              { status: 'todo', label: 'A Fazer' },
+              { status: 'in_tsukuyomi', label: 'No Tsukuyomi' },
+              { status: 'completed', label: 'Concluídas' },
+            ] as const
+          ).map((tab) => {
+            const isActive = activeMobileColumn === tab.status;
+            const count = groupedMissions[tab.status].length;
+            return (
+              <button
+                key={tab.status}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onMouseEnter={() => audioEngine.playHover()}
+                onClick={() => {
+                  audioEngine.playClick();
+                  setActiveMobileColumn(tab.status);
+                }}
+                className={cn(
+                  'flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border px-2 py-1.5 text-xs font-semibold transition-colors',
+                  isActive
+                    ? 'border-[#DC2626]/65 bg-gradient-to-b from-red-950/75 via-[#190507]/95 to-black text-white shadow-[0_0_16px_rgba(220,38,38,0.28)]'
+                    : 'border-transparent bg-transparent text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200',
+                )}
+              >
+                <span className="truncate">{tab.label}</span>
+                <span
+                  className={cn(
+                    'rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums',
+                    isActive
+                      ? 'bg-red-500/25 text-red-200'
+                      : 'bg-zinc-900 text-zinc-400',
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* 3-Column 2.5D Obsidian Totem Drag & Drop Board */}
         <DndContext
           id="tsukuyomi-kanban-dnd"
@@ -520,21 +575,29 @@ export function KanbanBoard() {
             className="grid grid-cols-1 gap-5 lg:grid-cols-3"
           >
             {COLUMN_CONFIG.map((column) => (
-              <KanbanColumn
+              <div
                 key={column.status}
-                status={column.status}
-                code={column.code}
-                title={column.title}
-                subtitle={column.subtitle}
-                emptyText={column.emptyText}
-                icon={getColumnIcon(column.status)}
-                missions={groupedMissions[column.status]}
-                activeMissionId={activeMissionId}
-                onAddClick={openNewMissionModal}
-                onDragToTsukuyomi={dragMissionToTsukuyomi}
-                onToggleAmaterasu={handleToggleAmaterasu}
-                onDeleteMission={deleteMission}
-              />
+                className={cn(
+                  column.status === activeMobileColumn
+                    ? 'block'
+                    : 'hidden lg:block',
+                )}
+              >
+                <KanbanColumn
+                  status={column.status}
+                  code={column.code}
+                  title={column.title}
+                  subtitle={column.subtitle}
+                  emptyText={column.emptyText}
+                  icon={getColumnIcon(column.status)}
+                  missions={groupedMissions[column.status]}
+                  activeMissionId={activeMissionId}
+                  onAddClick={openNewMissionModal}
+                  onDragToTsukuyomi={dragMissionToTsukuyomi}
+                  onToggleAmaterasu={handleToggleAmaterasu}
+                  onDeleteMission={deleteMission}
+                />
+              </div>
             ))}
           </div>
 

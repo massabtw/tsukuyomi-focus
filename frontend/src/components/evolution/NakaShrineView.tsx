@@ -54,12 +54,9 @@ const CUTIN_IMAGE_MAP: Record<MangekyouVariant, string> = {
 export function NakaShrineView() {
   const prefersReducedMotion = Boolean(useReducedMotion());
   const shrineRef = useRef<HTMLDivElement | null>(null);
-  const conduitRef = useRef<HTMLDivElement | null>(null);
   const cutInTimerRef = useRef<number | null>(null);
 
   const stoneNoiseId = useId();
-  const conduitGradId = useId();
-  const conduitGlowId = useId();
 
   const {
     chakra,
@@ -111,17 +108,6 @@ export function NakaShrineView() {
     scrollYProgress,
     [0, 1],
     prefersReducedMotion ? ['0%', '0%'] : ['0%', '-6%'],
-  );
-
-  // Scroll-driven vertical rune conduit fill across the 7 stages
-  const { scrollYProgress: conduitScrollProgress } = useScroll({
-    target: conduitRef,
-    offset: ['start 78%', 'end 62%'],
-  });
-  const conduitPathLength = useTransform(
-    conduitScrollProgress,
-    [0, 1],
-    prefersReducedMotion ? [1, 1] : [0.06, 1],
   );
 
   // 4-layer cursor parallax for the Naka Altar showcase (MotionValues only, zero useState)
@@ -556,83 +542,7 @@ export function NakaShrineView() {
             ) : null}
           </div>
 
-          <div ref={conduitRef} className="relative space-y-3">
-            {/* Scroll-Driven Engraving Rune Glow SVG Conduit */}
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 800"
-              preserveAspectRatio="none"
-              className="pointer-events-none absolute bottom-8 left-[52px] top-8 hidden w-6 -translate-x-1/2 overflow-visible md:block"
-            >
-              <defs>
-                <linearGradient
-                  id={conduitGradId}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor="#EF4444" stopOpacity="0.95" />
-                  <stop offset="50%" stopColor="#DC2626" stopOpacity="1" />
-                  <stop offset="100%" stopColor="#FCA5A5" stopOpacity="0.95" />
-                </linearGradient>
-                <filter
-                  id={conduitGlowId}
-                  x="-200%"
-                  y="-10%"
-                  width="500%"
-                  height="120%"
-                >
-                  <feGaussianBlur stdDeviation="2.5" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-
-              {/* Base carved stone channel */}
-              <path
-                d="M 12 0 L 12 800"
-                stroke="rgba(255, 255, 255, 0.08)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                fill="none"
-              />
-
-              {/* Etched Uchiha rune diamond notches */}
-              {[80, 200, 320, 440, 560, 680].map((yPos) => (
-                <path
-                  key={yPos}
-                  d={`M 12 ${yPos - 5} L 16 ${yPos} L 12 ${yPos + 5} L 8 ${yPos} Z`}
-                  fill="rgba(220, 38, 38, 0.16)"
-                  stroke="rgba(239, 68, 68, 0.25)"
-                  strokeWidth="0.75"
-                />
-              ))}
-
-              {/* Soft outer blood/chakra glow driven by scroll */}
-              <motion.path
-                d="M 12 0 L 12 800"
-                stroke={`url(#${conduitGradId})`}
-                strokeWidth="5"
-                strokeLinecap="round"
-                fill="none"
-                filter={`url(#${conduitGlowId})`}
-                style={{ pathLength: conduitPathLength, opacity: 0.45 }}
-              />
-
-              {/* Crisp core chakra engraving stroke driven by scroll */}
-              <motion.path
-                d="M 12 0 L 12 800"
-                stroke={`url(#${conduitGradId})`}
-                strokeWidth="2"
-                strokeLinecap="round"
-                fill="none"
-                style={{ pathLength: conduitPathLength }}
-              />
-            </svg>
-
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {EYE_STAGES.map((def, idx) => {
               const loreUnlocked = isEyeStageUnlocked(
                 def.stage,
@@ -654,6 +564,7 @@ export function NakaShrineView() {
                 longestStreak >= def.alternativeStreakRequirement &&
                 chakra < def.requiredChakra;
               const isFlashing = stageFlash?.stage === def.stage;
+              const isPinnacleStage = idx === EYE_STAGES.length - 1;
 
               return (
                 <motion.article
@@ -675,7 +586,8 @@ export function NakaShrineView() {
                     }
                   }}
                   className={cn(
-                    'will-change-transform relative flex flex-col gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5',
+                    'will-change-transform relative flex flex-col justify-between gap-4 rounded-2xl p-4 sm:p-5',
+                    isPinnacleStage && 'sm:col-span-2 lg:col-span-3 lg:flex-row lg:items-center lg:justify-between',
                     isEquipped
                       ? 'obsidian-surface-crimson border border-red-600/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] hover:border-red-500/80 transition-colors'
                       : unlocked
@@ -703,11 +615,11 @@ export function NakaShrineView() {
                     )}
                   </AnimatePresence>
 
-                  <div className="flex items-start gap-4 sm:items-center">
+                  <div className="flex items-start gap-3.5 sm:gap-4">
                     {/* Eye preview wrapper */}
                     <div
                       className={cn(
-                        'relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-full border bg-black p-1.5',
+                        'relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full border bg-black p-1.5 sm:h-16 sm:w-16',
                         unlocked
                           ? 'border-red-900/80 shadow-[0_0_16px_rgba(220,38,38,0.28)]'
                           : 'border-zinc-800 grayscale',
@@ -734,12 +646,12 @@ export function NakaShrineView() {
                       </AnimatePresence>
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono tabular-nums text-[11px] font-semibold text-zinc-500">
                           {String(idx + 1).padStart(2, '0')}
                         </span>
-                        <h3 className="font-display text-base font-semibold text-zinc-100 sm:text-lg">
+                        <h3 className="font-display text-base font-semibold text-zinc-100">
                           {def.name}
                         </h3>
                         {isEquipped ? (
@@ -785,15 +697,20 @@ export function NakaShrineView() {
                       <p className="text-xs font-medium uppercase tracking-wider text-red-400/90">
                         {def.subtitle}
                       </p>
-                      <p className="max-w-2xl text-xs leading-relaxed text-zinc-400 sm:text-sm">
+                      <p className="text-xs leading-relaxed text-zinc-400">
                         {def.lore}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex flex-row items-center justify-between gap-4 border-t border-zinc-800/70 pt-3 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
-                    <div className="text-left sm:text-right">
-                      <p className="font-mono tabular-nums text-sm font-semibold text-zinc-200">
+                  <div
+                    className={cn(
+                      'flex flex-row items-center justify-between gap-3 border-t border-zinc-800/70 pt-3',
+                      isPinnacleStage && 'lg:shrink-0 lg:border-t-0 lg:pt-0',
+                    )}
+                  >
+                    <div className="text-left">
+                      <p className="font-mono tabular-nums text-xs font-semibold text-zinc-200 sm:text-sm">
                         {def.requiredChakra.toLocaleString('pt-BR')} Chakra
                       </p>
                       <p className="font-mono tabular-nums text-[11px] text-zinc-500">

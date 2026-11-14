@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { CalendarDays } from 'lucide-react';
-import { motion, useReducedMotion } from 'framer-motion';
 import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import {
@@ -62,9 +61,8 @@ interface WeekColumn {
   monthLabel: string | null;
 }
 
-export function UchihaHeatmap() {
+export const UchihaHeatmap = memo(function UchihaHeatmap() {
   const sessionLogs = useTsukuyomiStore((s) => s.sessionLogs);
-  const prefersReducedMotion = Boolean(useReducedMotion());
   const [hoveredCell, setHoveredCell] = useState<{
     cell: HeatmapDayCell;
     weekIndex: number;
@@ -176,8 +174,8 @@ export function UchihaHeatmap() {
       </div>
 
       {/* 52+ Weeks Grid */}
-      <div className="mt-5 overflow-x-auto pb-2">
-        <div className="inline-flex min-w-full flex-col gap-1.5">
+      <div className="custom-scrollbar mt-5 overflow-x-auto pb-3">
+        <div className="inline-flex min-w-[700px] flex-col gap-1.5">
           {/* Month Header Row */}
           <div className="flex items-center gap-1 pl-8">
             {weeks.map((week, weekIdx) => (
@@ -275,22 +273,10 @@ export function UchihaHeatmap() {
                             isNeighbor && cell.level === 0 && 'bg-[#2A0E12]',
                           )}
                         >
-                          {cell.level === 4 && !prefersReducedMotion ? (
-                            <motion.span
+                          {cell.level === 4 ? (
+                            <span
                               aria-hidden="true"
-                              animate={{
-                                opacity: [0.45, 1, 0.45],
-                                scale: [0.96, 1.14, 0.96],
-                              }}
-                              transition={{
-                                duration: 2.2,
-                                delay: (weekIdx + dayIdx) * 0.06,
-                                repeat: Infinity,
-                                ease: 'easeInOut',
-                                type: 'tween',
-                              }}
-                              style={{ willChange: 'transform, opacity' }}
-                              className="pointer-events-none absolute -inset-px rounded-[3px] bg-red-400/55 shadow-[0_0_10px_rgba(239,68,68,0.85)]"
+                              className="pointer-events-none absolute -inset-px rounded-[3px] bg-red-400/35 shadow-[0_0_8px_rgba(239,68,68,0.75)]"
                             />
                           ) : null}
                         </button>
@@ -355,4 +341,4 @@ export function UchihaHeatmap() {
       </div>
     </section>
   );
-}
+});

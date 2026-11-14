@@ -346,12 +346,66 @@
   font-variant-numeric: tabular-nums;
 }
 
+@keyframes ocular-spin {
+  from {
+    transform: rotate(0deg) translateZ(0);
+  }
+  to {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
+
+.animate-ocular-spin {
+  animation-name: ocular-spin;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+@keyframes amaterasu-ember-rise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.85);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(var(--ember-drift, 6px), -42px, 0) scale(0.2);
+    opacity: 0;
+  }
+}
+
+.animate-amaterasu-ember {
+  animation: amaterasu-ember-rise var(--ember-duration, 2.2s) ease-out infinite;
+  animation-delay: var(--ember-delay, 0s);
+  will-change: transform, opacity;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(9, 9, 11, 0.8);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(220, 38, 38, 0.38);
+  border-radius: 9999px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-uchiha-pulse,
   .animate-amaterasu-flicker,
   .animate-genjutsu-drift,
   .animate-sharingan-flare,
-  .animate-chakra-flow {
+  .animate-chakra-flow,
+  .animate-ocular-spin,
+  .animate-amaterasu-ember {
     animation: none !important;
   }
 }

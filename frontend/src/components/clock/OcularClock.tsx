@@ -295,16 +295,6 @@ export function OcularClock() {
       if (spinBurstScope.current) {
         void animateSpinBurst(
           spinBurstScope.current,
-          { filter: ['blur(0px)', 'blur(2px)', 'blur(0px)'] },
-          {
-            type: 'tween',
-            duration: 0.45,
-            times: [0, 0.4, 1],
-            ease: BURST_EASE,
-          },
-        );
-        void animateSpinBurst(
-          spinBurstScope.current,
           { rotate: targetAngle },
           {
             type: 'tween',
@@ -372,18 +362,16 @@ export function OcularClock() {
   }
 
   const useCustomImage = Boolean(customEye.enabled && customEye.imageDataUrl);
-  const effectiveGlow = useCustomImage
+  const effectiveGlowOpacity = useCustomImage
     ? Math.min(1, customEye.glowIntensity + (isUrgent ? 0.25 : 0))
     : isUrgent
-      ? 0.85
+      ? 0.92
       : isRunning
-        ? 0.5
-        : 0.28;
+        ? 0.72
+        : 0.48;
 
-  const eyeDropShadow =
-    equippedEyeStage === 'rinnegan' && !useCustomImage
-      ? `0 0 ${isUrgent ? 28 : 18}px rgba(139, 92, 246, ${effectiveGlow})`
-      : `0 0 ${isUrgent ? 34 : 20}px rgba(220, 38, 38, ${effectiveGlow})`;
+  const effectiveCrimsonHex =
+    equippedEyeStage === 'rinnegan' && !useCustomImage ? '#8B5CF6' : '#DC2626';
 
   const susanooActive =
     (susanooEnabled && isFocus) || susanooStageOverride !== 'auto';
@@ -392,14 +380,14 @@ export function OcularClock() {
 
   return (
     <div
-      className="relative flex flex-col items-center justify-center py-8 sm:py-12 select-none"
+      className="relative flex flex-col items-center justify-center py-6 sm:py-10 select-none"
       style={{ perspective: 1200 }}
       onPointerMove={handleClockPointerMove}
       onPointerLeave={handleClockPointerLeave}
       onPointerEnter={() => audioEngine.playHover()}
     >
       {/* Interactive 4-Layer Stage */}
-      <div className="relative flex h-[340px] w-[340px] items-center justify-center">
+      <div className="relative flex h-60 w-60 sm:h-72 sm:w-72 md:h-80 md:w-80 lg:h-96 lg:w-96 items-center justify-center">
         {/* Expanding Chakra Shockwave Ring around OcularClock */}
         <div
           ref={shockwaveScope}
@@ -431,16 +419,18 @@ export function OcularClock() {
         {/* Plano -1: Susanoo Aura / Ritual Architecture */}
         <motion.div
           style={{ x: parallax.layerMid.x, y: parallax.layerMid.y }}
-          className="pointer-events-none absolute -inset-[110px] m-auto flex h-[560px] w-[560px] items-center justify-center will-change-transform"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center will-change-transform"
         >
-          <SusanooAura
-            progress={progressPercent}
-            enabled={susanooActive}
-            isRunning={isRunning}
-            variant={mangekyouVariant}
-            stageOverride={susanooStageOverride}
-            className="h-[560px] w-[560px]"
-          />
+          <div className="relative flex h-[340px] w-[340px] shrink-0 scale-[0.71] sm:scale-[0.85] md:scale-[0.94] lg:scale-[1.13] items-center justify-center transform-gpu">
+            <SusanooAura
+              progress={progressPercent}
+              enabled={susanooActive}
+              isRunning={isRunning}
+              variant={mangekyouVariant}
+              stageOverride={susanooStageOverride}
+              className="h-[560px] w-[560px] shrink-0"
+            />
+          </div>
         </motion.div>
 
         {/* Plano 0: Sculpted Obsidian Bezel & Precision Mechanical Ring */}
@@ -545,11 +535,7 @@ export function OcularClock() {
               transform="rotate(-90 160 160)"
               className="transition-colors duration-700"
               style={{
-                transition:
-                  'stroke-dashoffset 280ms linear, stroke 700ms ease, filter 700ms ease',
-                filter: isRunning
-                  ? 'drop-shadow(0 0 10px var(--chakra-glow, rgba(220, 38, 38, 0.42)))'
-                  : 'none',
+                transition: 'stroke-dashoffset 280ms linear, stroke 700ms ease',
               }}
             />
           </svg>
@@ -643,20 +629,29 @@ export function OcularClock() {
             )}
           </AnimatePresence>
 
+          {/* Static Non-Rotating Ocular Glow Layer */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-[12%] z-10 rounded-full"
+            style={{
+              opacity: effectiveGlowOpacity,
+              background: `radial-gradient(circle, ${effectiveCrimsonHex}45 0%, ${effectiveCrimsonHex}18 48%, transparent 74%)`,
+            }}
+          />
+
           {/* Plano +1: Ocular Core (Sharingan SVG or Custom IA Image + 3D Spherical Cornea) */}
           <motion.div
             style={{ x: parallax.layerFg.x, y: parallax.layerFg.y }}
-            className="absolute z-20 flex h-[228px] w-[228px] items-center justify-center will-change-transform"
+            className="absolute z-20 flex h-[67%] w-[67%] items-center justify-center will-change-transform transform-gpu"
           >
-            {/* 2-state Spring Awakening & Outer Eye Glow */}
+            {/* 2-state Spring Awakening */}
             <div
               ref={awakeningScope}
-              className="h-full w-full will-change-transform"
+              className="h-full w-full will-change-transform transform-gpu"
             >
               {/* Cyclic Breathing Tween Wrapper ([1, 1.025, 1] strictly tween) */}
               <motion.div
-                className="h-full w-full rounded-full will-change-transform"
-                style={{ filter: `drop-shadow(${eyeDropShadow})` }}
+                className="h-full w-full rounded-full will-change-transform transform-gpu"
                 animate={
                   prefersReducedMotion
                     ? { scale: 1 }
@@ -678,31 +673,27 @@ export function OcularClock() {
                   {/* Biological Saccadic Eye Twitch Wrapper */}
                   <div
                     ref={saccadeScope}
-                    className="h-full w-full will-change-transform"
+                    className="h-full w-full will-change-transform transform-gpu"
                   >
-                    {/* Centrifugal Spin Burst Wrapper (-15deg recoil -> +720deg snap + motion blur) */}
+                    {/* Centrifugal Spin Burst Wrapper (-15deg recoil -> +720deg snap) */}
                     <div
                       ref={spinBurstScope}
-                      className="h-full w-full rounded-full will-change-transform"
+                      className="h-full w-full rounded-full will-change-transform transform-gpu"
                     >
-                      {/* Continuous 60fps Rotation Tween Wrapper */}
-                      <motion.div
-                        className="h-full w-full rounded-full will-change-transform"
-                        animate={
-                          prefersReducedMotion || isPaused
-                            ? { rotate: 0 }
-                            : { rotate: 360 }
-                        }
-                        transition={
-                          prefersReducedMotion || isPaused
-                            ? { duration: 0.3 }
-                            : {
-                                type: 'tween',
-                                ease: 'linear',
-                                duration: isUrgent ? 6 : 30,
-                                repeat: Infinity,
-                              }
-                        }
+                      {/* Continuous GPU-Composited Pure CSS Rotation Wrapper */}
+                      <div
+                        className="animate-ocular-spin h-full w-full rounded-full will-change-transform transform-gpu"
+                        style={{
+                          animationDuration: isUrgent
+                            ? '2s'
+                            : isRunning && isFocus
+                              ? '8s'
+                              : '30s',
+                          animationPlayState:
+                            prefersReducedMotion || isPaused
+                              ? 'paused'
+                              : 'running',
+                        }}
                       >
                         {useCustomImage && customEye.imageDataUrl ? (
                           <div className="relative h-full w-full overflow-hidden rounded-full border-4 border-[#09090B] bg-black">
@@ -732,7 +723,7 @@ export function OcularClock() {
                             hideCorneaSpecular
                           />
                         )}
-                      </motion.div>
+                      </div>
                     </div>
                   </div>
 
@@ -869,10 +860,8 @@ export function OcularClock() {
           aria-live="off"
           aria-label={formattedClock}
           className={cn(
-            'inline-flex items-center justify-center font-mono text-7xl font-semibold tracking-tighter tabular-nums transition-colors duration-700 md:text-8xl',
-            isUrgent
-              ? 'text-red-400 drop-shadow-[0_0_18px_rgba(239,68,68,0.55)]'
-              : 'text-zinc-50 drop-shadow-[0_6px_28px_rgba(0,0,0,0.85)]',
+            'inline-flex items-center justify-center font-mono text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tighter tabular-nums transition-colors duration-700',
+            isUrgent ? 'text-red-400' : 'text-zinc-50',
           )}
         >
           {clockCharacters.map((char, idx) => (
@@ -890,18 +879,18 @@ export function OcularClock() {
                   initial={
                     prefersReducedMotion
                       ? false
-                      : { y: 20, rotateX: 52, opacity: 0, filter: 'blur(4px)' }
+                      : { y: 20, rotateX: 52, opacity: 0 }
                   }
-                  animate={{ y: 0, rotateX: 0, opacity: 1, filter: 'blur(0px)' }}
+                  animate={{ y: 0, rotateX: 0, opacity: 1 }}
                   exit={
                     prefersReducedMotion
                       ? { opacity: 0 }
-                      : { y: -20, rotateX: -52, opacity: 0, filter: 'blur(4px)' }
+                      : { y: -20, rotateX: -52, opacity: 0 }
                   }
                   transition={
                     prefersReducedMotion ? { duration: 0 } : DIGIT_FLIP_SPRING
                   }
-                  className="inline-block will-change-transform"
+                  className="inline-block will-change-transform transform-gpu"
                 >
                   {char}
                 </motion.span>

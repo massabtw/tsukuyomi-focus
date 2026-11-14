@@ -1,9 +1,11 @@
 'use client';
 
 import {
+  memo,
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEvent,
   type PointerEvent,
 } from 'react';
@@ -62,18 +64,15 @@ const AMATERASU_EMBERS: ReadonlyArray<{
   left?: string;
   top?: string;
   dx: number;
-  dy: [number, number, number];
   delay: number;
   duration: number;
   size: number;
-  hoverOnly?: boolean;
 }> = [
   {
     id: 'ember-top-1',
     positionClass: '-top-1',
-    left: '12%',
+    left: '14%',
     dx: -4,
-    dy: [4, -14, -28],
     delay: 0,
     duration: 2.1,
     size: 4,
@@ -81,96 +80,47 @@ const AMATERASU_EMBERS: ReadonlyArray<{
   {
     id: 'ember-top-2',
     positionClass: '-top-1',
-    left: '28%',
+    left: '36%',
     dx: 5,
-    dy: [4, -15, -30],
     delay: 0.45,
-    duration: 2.4,
+    duration: 2.35,
     size: 5,
   },
   {
     id: 'ember-top-3',
     positionClass: '-top-1',
-    left: '46%',
-    dx: -3,
-    dy: [4, -13, -26],
-    delay: 0.9,
-    duration: 1.9,
+    left: '62%',
+    dx: -4,
+    delay: 0.85,
+    duration: 2.0,
     size: 4,
   },
   {
     id: 'ember-top-4',
     positionClass: '-top-1',
-    left: '63%',
+    left: '84%',
     dx: 4,
-    dy: [4, -16, -32],
     delay: 0.25,
-    duration: 2.3,
+    duration: 2.25,
     size: 5,
-  },
-  {
-    id: 'ember-top-5',
-    positionClass: '-top-1',
-    left: '78%',
-    dx: -5,
-    dy: [4, -14, -28],
-    delay: 0.75,
-    duration: 2.0,
-    size: 4,
-  },
-  {
-    id: 'ember-top-6',
-    positionClass: '-top-1',
-    left: '90%',
-    dx: 3,
-    dy: [4, -12, -24],
-    delay: 1.2,
-    duration: 2.2,
-    size: 3,
   },
   {
     id: 'ember-left-1',
     positionClass: 'left-1.5',
-    top: '38%',
+    top: '44%',
     dx: 6,
-    dy: [0, -18, -36],
-    delay: 0.15,
-    duration: 1.75,
-    size: 4,
-    hoverOnly: true,
-  },
-  {
-    id: 'ember-left-2',
-    positionClass: 'left-3',
-    top: '68%',
-    dx: 8,
-    dy: [0, -20, -40],
-    delay: 0.55,
+    delay: 0.3,
     duration: 1.9,
-    size: 5,
-    hoverOnly: true,
+    size: 4,
   },
   {
     id: 'ember-right-1',
     positionClass: 'right-1.5',
-    top: '34%',
+    top: '48%',
     dx: -6,
-    dy: [0, -18, -36],
-    delay: 0.3,
-    duration: 1.8,
+    delay: 0.65,
+    duration: 1.95,
     size: 4,
-    hoverOnly: true,
-  },
-  {
-    id: 'ember-right-2',
-    positionClass: 'right-3',
-    top: '70%',
-    dx: -8,
-    dy: [0, -22, -42],
-    delay: 0.7,
-    duration: 2.0,
-    size: 5,
-    hoverOnly: true,
   },
 ];
 
@@ -200,9 +150,8 @@ function AmaterasuFlameEmblem({
               repeat: Infinity,
             }
       }
-      className="pointer-events-none relative flex h-5 w-5 items-center justify-center will-change-transform"
+      className="pointer-events-none relative flex h-5 w-5 items-center justify-center will-change-transform transform-gpu"
       style={{
-        filter: 'drop-shadow(0 0 8px rgba(220, 38, 38, 0.75))',
         transformOrigin: 'bottom center',
       }}
     >
@@ -307,9 +256,8 @@ function AmaterasuLivingFlames({
           }
           style={{
             transformOrigin: 'bottom center',
-            filter: 'drop-shadow(0 0 8px rgba(220, 38, 38, 0.8))',
           }}
-          className="absolute inset-x-0 bottom-0 h-5 will-change-transform"
+          className="absolute inset-x-0 bottom-0 h-5 will-change-transform transform-gpu"
         >
           <svg
             viewBox="0 0 320 28"
@@ -350,9 +298,8 @@ function AmaterasuLivingFlames({
         }
         style={{
           transformOrigin: 'right center',
-          filter: 'drop-shadow(0 0 6px rgba(220, 38, 38, 0.7))',
         }}
-        className="absolute top-4 -left-2 h-16 w-3 will-change-transform"
+        className="absolute top-4 -left-2 h-16 w-3 will-change-transform transform-gpu"
       >
         <svg
           viewBox="0 0 12 64"
@@ -391,9 +338,8 @@ function AmaterasuLivingFlames({
         }
         style={{
           transformOrigin: 'left center',
-          filter: 'drop-shadow(0 0 6px rgba(220, 38, 38, 0.7))',
         }}
-        className="absolute top-4 -right-2 h-16 w-3 will-change-transform"
+        className="absolute top-4 -right-2 h-16 w-3 will-change-transform transform-gpu"
       >
         <svg
           viewBox="0 0 12 64"
@@ -410,36 +356,33 @@ function AmaterasuLivingFlames({
         </svg>
       </motion.div>
 
-      {/* Rising Black Embers Rimmed in #DC2626 (never orange/yellow) */}
-      {!prefersReducedMotion &&
-        AMATERASU_EMBERS.filter((ember) => !ember.hoverOnly || isHovered).map(
-          (ember) => (
-            <motion.span
+      {/* Rising Black Embers Rimmed in #DC2626 (pure CSS GPU particles, disabled on mobile < 768px) */}
+      {!prefersReducedMotion && (
+        <div className="hidden md:block">
+          {AMATERASU_EMBERS.map((ember) => (
+            <span
               key={ember.id}
-              style={{
-                left: ember.left,
-                top: ember.top,
-                width: ember.size,
-                height: ember.size,
-                boxShadow: '0 0 8px rgba(220, 38, 38, 0.95)',
-              }}
-              animate={{
-                y: ember.dy,
-                x: [0, ember.dx, -ember.dx],
-                opacity: [0, 0.95, 0],
-                scale: [0.7, 1.15, 0.2],
-              }}
-              transition={{
-                type: 'tween',
-                duration: isHovered ? ember.duration * 0.78 : ember.duration,
-                delay: ember.delay,
-                ease: 'easeOut',
-                repeat: Infinity,
-              }}
-              className="absolute rounded-full border border-[#DC2626] bg-[#000000] will-change-transform"
+              style={
+                {
+                  left: ember.left,
+                  top: ember.top,
+                  width: ember.size,
+                  height: ember.size,
+                  '--ember-drift': `${ember.dx}px`,
+                  '--ember-duration': `${
+                    isHovered ? ember.duration * 0.8 : ember.duration
+                  }s`,
+                  '--ember-delay': `${ember.delay}s`,
+                } as CSSProperties
+              }
+              className={cn(
+                'animate-amaterasu-ember absolute rounded-full border border-[#DC2626] bg-[#000000] will-change-transform',
+                ember.positionClass,
+              )}
             />
-          ),
-        )}
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -783,15 +726,15 @@ function MissionCardSurface({
                   />
                 </motion.div>
 
-                {/* Left burning-paper edge creep inward on hover */}
+                {/* Left burning-paper edge creep inward on hover (GPU scaleX, zero layout thrashing) */}
                 <motion.div
+                  style={{ transformOrigin: 'left center' }}
                   animate={{
-                    width: activeHover ? 112 : 44,
+                    scaleX: activeHover ? 1 : 0.4,
                     opacity: activeHover ? 0.96 : 0.62,
-                    x: activeHover ? 0 : -8,
                   }}
                   transition={{ type: 'tween', duration: 0.32, ease: 'easeOut' }}
-                  className="absolute inset-y-0 left-0 overflow-hidden will-change-transform"
+                  className="absolute inset-y-0 left-0 w-28 overflow-hidden will-change-transform transform-gpu"
                 >
                   <div className="relative h-full w-32">
                     <Image
@@ -807,15 +750,15 @@ function MissionCardSurface({
                   <div className="absolute inset-y-2 right-0 w-px bg-gradient-to-b from-transparent via-[#DC2626]/80 to-transparent" />
                 </motion.div>
 
-                {/* Right burning-paper edge creep inward on hover */}
+                {/* Right burning-paper edge creep inward on hover (GPU scaleX, zero layout thrashing) */}
                 <motion.div
+                  style={{ transformOrigin: 'right center' }}
                   animate={{
-                    width: activeHover ? 112 : 44,
+                    scaleX: activeHover ? 1 : 0.4,
                     opacity: activeHover ? 0.96 : 0.62,
-                    x: activeHover ? 0 : 8,
                   }}
                   transition={{ type: 'tween', duration: 0.32, ease: 'easeOut' }}
-                  className="absolute inset-y-0 right-0 overflow-hidden will-change-transform"
+                  className="absolute inset-y-0 right-0 w-28 overflow-hidden will-change-transform transform-gpu"
                 >
                   <div className="relative ml-auto h-full w-32">
                     <Image
@@ -1061,7 +1004,7 @@ function MissionCardSurface({
                           : `Marcar missão ${mission.title} com Amaterasu`
                       }
                       className={cn(
-                        'rounded-md border p-1.5 transition-colors',
+                        'inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md border p-2 transition-colors',
                         mission.isAmaterasu
                           ? 'border-[#DC2626]/80 bg-[#000000] text-[#EF4444] hover:bg-[#450A0A]/60'
                           : 'border-transparent bg-transparent text-[#52525B] hover:border-[#7F1D1D]/60 hover:bg-[#09090B] hover:text-[#DC2626]',
@@ -1091,7 +1034,7 @@ function MissionCardSurface({
                       disabled={isVortexing}
                       title="Remover missão"
                       aria-label={`Remover missão ${mission.title}`}
-                      className="rounded-md border border-transparent p-1.5 text-[#52525B] transition-colors hover:border-[#27272A] hover:bg-[#09090B] hover:text-[#EF4444]"
+                      className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md border border-transparent p-2 text-[#52525B] transition-colors hover:border-[#27272A] hover:bg-[#09090B] hover:text-[#EF4444]"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </motion.button>
@@ -1181,7 +1124,7 @@ function MissionCardSurface({
                   onClick={handleTragarClick}
                   disabled={isVortexing}
                   className={cn(
-                    'flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors',
+                    'flex min-h-[40px] w-full cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors',
                     mission.isAmaterasu
                       ? 'border-[#DC2626]/70 bg-[#000000] text-[#FAFAFA] hover:border-[#EF4444] hover:bg-[#450A0A]/50'
                       : isActiveInTemple
@@ -1238,9 +1181,9 @@ function SortableMissionCard(props: MissionCardProps) {
   );
 }
 
-export function MissionCard(props: MissionCardProps) {
+export const MissionCard = memo(function MissionCard(props: MissionCardProps) {
   if (props.isOverlay) {
     return <MissionCardSurface {...props} isDragging isOverlay />;
   }
   return <SortableMissionCard {...props} />;
-}
+});

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId } from 'react';
+import { memo, useEffect, useId } from 'react';
 import {
   motion,
   useAnimate,
@@ -178,7 +178,7 @@ function MangekyouPattern({
   }
 }
 
-export function SharinganSvg({
+export const SharinganSvg = memo(function SharinganSvg({
   stage,
   variant = 'itachi',
   className,
@@ -456,4 +456,4 @@ export function SharinganSvg({
       )}
     </svg>
   );
-}
+});

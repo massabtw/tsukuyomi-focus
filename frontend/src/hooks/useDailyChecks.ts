@@ -12,9 +12,12 @@ const DAILY_CHECK_INTERVAL_MS = 60_000;
 export function useDailyChecks(): void {
   const hasHydrated = useHasHydrated();
   const runDailyChecks = useTsukuyomiStore((state) => state.runDailyChecks);
+  const syncFromBackend = useTsukuyomiStore((state) => state.syncFromBackend);
 
   useEffect(() => {
     if (!hasHydrated) return;
+
+    void syncFromBackend();
 
     const executeCheck = () => {
       runDailyChecks();
@@ -41,5 +44,5 @@ export function useDailyChecks(): void {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', executeCheck);
     };
-  }, [hasHydrated, runDailyChecks]);
+  }, [hasHydrated, runDailyChecks, syncFromBackend]);
 }

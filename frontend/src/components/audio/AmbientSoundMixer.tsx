@@ -320,7 +320,7 @@ export function AmbientSoundMixer({ compact = false }: AmbientSoundMixerProps) {
         ref={podRef}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className="fixed bottom-5 left-5 z-40"
+        className="fixed bottom-20 left-3 z-40 sm:left-5 lg:bottom-5"
       >
         <AnimatePresence>
           {isPopoverOpen && (
@@ -344,7 +344,7 @@ export function AmbientSoundMixer({ compact = false }: AmbientSoundMixerProps) {
                 ease: [0.16, 1, 0.3, 1],
                 type: 'tween',
               }}
-              className="absolute bottom-[calc(100%+0.6rem)] left-0 w-[300px] rounded-2xl border border-white/10 bg-black/80 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.95)] backdrop-blur-2xl sm:w-[340px]"
+              className="absolute bottom-[calc(100%+0.6rem)] left-0 w-[calc(100vw-1.5rem)] max-w-[340px] rounded-2xl border border-white/10 bg-black/80 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.95)] backdrop-blur-2xl"
             >
               {/* Invisible hover bridge between capsule and floating popover */}
               <div
@@ -444,7 +444,10 @@ export function AmbientSoundMixer({ compact = false }: AmbientSoundMixerProps) {
               ))}
             </span>
 
-            <span className="text-xs font-medium whitespace-nowrap text-zinc-200">
+            <span className="text-xs font-medium whitespace-nowrap text-zinc-200 sm:hidden">
+              Áudio
+            </span>
+            <span className="hidden text-xs font-medium whitespace-nowrap text-zinc-200 sm:inline">
               Ambiente Sonoro
             </span>
           </button>

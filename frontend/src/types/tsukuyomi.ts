@@ -91,6 +91,25 @@ export interface CustomEyeConfig {
   glowIntensity: number;
 }
 
+export interface GeneratedSharinganLore {
+  doujutsuName: string;
+  loreDescription: string;
+  rawSvgCode: string;
+  svgDataUri: string;
+  rasterImageUrl: string;
+  primaryGlowColor: string;
+  equippedImageUrl: string;
+  outputFormat: 'svg' | 'raster';
+}
+
+export interface GenerateSharinganInput {
+  prompt?: string;
+  baseEyeImageBase64?: string | null;
+  styleVariant?: MangekyouVariant | 'custom';
+  outputFormat?: 'svg' | 'raster';
+  autoEquip?: boolean;
+}
+
 export interface AudioSettings {
   muted: boolean;
   sfxVolume: number;
@@ -194,6 +213,9 @@ export interface TsukuyomiState {
   izanagiFlashNonce: number;
   tsukuyomiCastNonce: number;
   ocularSpinBurstNonce: number;
+  backendConnected: boolean;
+  isGeneratingSharingan: boolean;
+  lastGeneratedSharingan: GeneratedSharinganLore | null;
 }
 
 export interface TsukuyomiActions {
@@ -245,6 +267,10 @@ export interface TsukuyomiActions {
   triggerTsukuyomiCastCutscene: () => void;
   dismissPendingAwakening: () => void;
   updateCustomEye: (patch: Partial<CustomEyeConfig>) => void;
+  syncFromBackend: () => Promise<void>;
+  generateCustomSharinganWithAi: (
+    input: GenerateSharinganInput,
+  ) => Promise<GeneratedSharinganLore>;
 
   updateAudioSettings: (patch: Partial<AudioSettings>) => void;
 

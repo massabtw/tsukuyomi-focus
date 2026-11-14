@@ -140,7 +140,7 @@ export function TimerControls({
     <div
       role="region"
       aria-label="Controles do Tsukuyomi"
-      className="flex w-full flex-col items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/65 px-4 py-3 shadow-[0_24px_60px_rgba(0,0,0,0.9),0_0_32px_var(--chakra-glow,rgba(220,38,38,0.18))] backdrop-blur-2xl transition-colors duration-700 lg:flex-row"
+      className="flex w-full flex-col items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/65 px-3 py-3 shadow-[0_24px_60px_rgba(0,0,0,0.9),0_0_32px_var(--chakra-glow,rgba(220,38,38,0.18))] backdrop-blur-2xl transition-colors duration-700 sm:px-4 lg:flex-row"
     >
       {/* Left: Presets Segmented Track + Break Pills + Active Mission Suggestion */}
       <div className="flex flex-wrap items-center justify-center gap-2 lg:justify-start">
@@ -357,7 +357,7 @@ export function TimerControls({
       )}
 
       {/* Right: Primary & Active Cycle Actions */}
-      <div className="flex flex-wrap items-center justify-center gap-2 shrink-0">
+      <div className="flex w-full flex-wrap items-center justify-center gap-2 lg:w-auto lg:shrink-0">
         {isIdle && (
           <>
             <motion.button

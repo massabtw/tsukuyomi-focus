@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -192,7 +192,7 @@ function TotemHeaderOrnament({ status }: { status: MissionStatus }) {
   );
 }
 
-export function KanbanColumn({
+export const KanbanColumn = memo(function KanbanColumn({
   status,
   code,
   title,
@@ -409,7 +409,7 @@ export function KanbanColumn({
               }}
               title={`Adicionar missão em ${title}`}
               aria-label={`Adicionar nova missão em ${title}`}
-              className="rounded-lg border border-white/[0.08] bg-[#0B0B0F] p-1.5 text-[#A1A1AA] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-[#DC2626]/60 hover:text-[#FAFAFA]"
+              className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg border border-white/[0.08] bg-[#0B0B0F] p-2 text-[#A1A1AA] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-[#DC2626]/60 hover:text-[#FAFAFA]"
             >
               <Plus className="h-4 w-4" />
             </motion.button>
@@ -483,4 +483,4 @@ export function KanbanColumn({
       </div>
     </section>
   );
-}
+});

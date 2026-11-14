@@ -226,5 +226,8 @@ export function createInitialSeedState(
     izanagiFlashNonce: 0,
     tsukuyomiCastNonce: 0,
     ocularSpinBurstNonce: 0,
+    backendConnected: false,
+    isGeneratingSharingan: false,
+    lastGeneratedSharingan: null,
   };
 }

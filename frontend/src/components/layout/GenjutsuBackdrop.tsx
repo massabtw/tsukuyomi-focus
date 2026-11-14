@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import {
   motion,
@@ -565,8 +565,6 @@ function updateAndDrawCrows(
     ctx.stroke();
 
     // Glowing chakra-tinted eyes
-    ctx.shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha.toFixed(3)})`;
-    ctx.shadowBlur = 8;
     ctx.fillStyle = `rgba(${rgb.brightR}, ${rgb.brightG}, ${rgb.brightB}, ${alpha.toFixed(3)})`;
     ctx.beginPath();
     ctx.arc(-w * 0.036, -w * 0.38, 1.45, 0, Math.PI * 2);
@@ -671,12 +669,9 @@ function MistTile({
   );
 }
 
-export function GenjutsuBackdrop() {
+export const GenjutsuBackdrop = memo(function GenjutsuBackdrop() {
   const isTsukuyomiMode = useIsTsukuyomiMode();
   const { status: timerStatus } = useTimerCore();
-  const currentMinuteBucket = useTsukuyomiStore((s) =>
-    Math.floor(s.timer.remainingSeconds / 60),
-  );
   const mangekyouVariant = useTsukuyomiStore((s) => s.mangekyouVariant);
   const izanagiFlashNonce = useTsukuyomiStore((s) => s.izanagiFlashNonce);
   const tsukuyomiCastNonce = useTsukuyomiCastNonce();
@@ -688,7 +683,7 @@ export function GenjutsuBackdrop() {
 
   const [crowPairs, setCrowPairs] = useState<CrowEyePair[]>([]);
   const [waterRippleNonce, setWaterRippleNonce] = useState(0);
-  const [foregroundFeatherNonce, setForegroundFeatherNonce] = useState(0);
+  const [foregroundFeatherNonce] = useState(0);
 
   const genjutsuActiveRef = useRef(isGenjutsuActive);
   useEffect(() => {
@@ -713,17 +708,12 @@ export function GenjutsuBackdrop() {
     crowPairsRef.current = crowPairs;
   }, [crowPairs]);
 
-  const prevMinuteRef = useRef<number | null>(null);
+  const prevCastNonceRef = useRef(tsukuyomiCastNonce);
   useEffect(() => {
-    const prevMinute = prevMinuteRef.current;
-    prevMinuteRef.current = currentMinuteBucket;
+    const prevCast = prevCastNonceRef.current;
+    prevCastNonceRef.current = tsukuyomiCastNonce;
 
-    if (
-      prefersReducedMotion ||
-      !isTimerRunning ||
-      prevMinute === null ||
-      currentMinuteBucket === prevMinute
-    ) {
+    if (prefersReducedMotion || tsukuyomiCastNonce <= prevCast) {
       return;
     }
 
@@ -733,7 +723,7 @@ export function GenjutsuBackdrop() {
     return () => {
       window.cancelAnimationFrame(rafId);
     };
-  }, [currentMinuteBucket, isTimerRunning, prefersReducedMotion]);
+  }, [tsukuyomiCastNonce, prefersReducedMotion]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -835,9 +825,13 @@ export function GenjutsuBackdrop() {
     };
   }, [prefersReducedMotion, rawX, rawY]);
 
-  // Ambient darkness blinking crow eyes lifecycle (outer screen edges)
+  // Ambient darkness blinking crow eyes lifecycle (outer screen edges, desktop only)
   useEffect(() => {
-    if (prefersReducedMotion || typeof window === 'undefined') {
+    if (
+      prefersReducedMotion ||
+      typeof window === 'undefined' ||
+      window.innerWidth < 768
+    ) {
       return;
     }
 
@@ -873,24 +867,13 @@ export function GenjutsuBackdrop() {
     };
   }, [prefersReducedMotion]);
 
-  // Depth-of-Field foreground giant feather sweeping across camera lens every 12s
+  // Layer -1: Wind-Physics Crow Feathers, Chakra Embers & Animated Crows Canvas (desktop only, max 8 particles)
   useEffect(() => {
-    if (prefersReducedMotion || typeof window === 'undefined') {
-      return;
-    }
-
-    const sweepInterval = window.setInterval(() => {
-      setForegroundFeatherNonce((n) => n + 1);
-    }, 12000);
-
-    return () => {
-      window.clearInterval(sweepInterval);
-    };
-  }, [prefersReducedMotion]);
-
-  // Layer -1: 60fps Wind-Physics Crow Feathers, Chakra Embers & Animated Crows Canvas
-  useEffect(() => {
-    if (prefersReducedMotion || typeof window === 'undefined') {
+    if (
+      prefersReducedMotion ||
+      typeof window === 'undefined' ||
+      window.innerWidth < 768
+    ) {
       return;
     }
 
@@ -914,8 +897,8 @@ export function GenjutsuBackdrop() {
 
     resizeCanvas();
 
-    const maxFeathers = 22;
-    const maxEmbers = 34;
+    const maxFeathers = 4;
+    const maxEmbers = 5;
     const feathers: FeatherParticle[] = Array.from({ length: maxFeathers }, () =>
       createFeather(width, height, true),
     );
@@ -933,6 +916,12 @@ export function GenjutsuBackdrop() {
       lastTime = now;
       const tSec = now * 0.001;
 
+      if (width < 768) {
+        ctx.clearRect(0, 0, width, height);
+        rafId = window.requestAnimationFrame(tick);
+        return;
+      }
+
       const currentCastNonce = tsukuyomiCastNonceRef.current;
       if (currentCastNonce > lastSeenCastNonce) {
         lastSeenCastNonce = currentCastNonce;
@@ -942,8 +931,8 @@ export function GenjutsuBackdrop() {
       }
 
       const active = genjutsuActiveRef.current;
-      const activeFeatherLimit = active ? maxFeathers : 7;
-      const activeEmberLimit = active ? maxEmbers : 10;
+      const activeFeatherLimit = active ? 3 : 2;
+      const activeEmberLimit = active ? 5 : 3;
       const rgb = chakraRgbRef.current;
 
       ctx.clearRect(0, 0, width, height);
@@ -1879,4 +1868,4 @@ export function GenjutsuBackdrop() {
       ) : null}
     </>
   );
-}
+});

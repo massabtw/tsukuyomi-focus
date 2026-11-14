@@ -124,7 +124,7 @@ export function ScrollStatsView() {
       {/* Top KPI Grid */}
       <section
         aria-label="Indicadores principais de desempenho"
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5"
       >
         {/* 1. Total Focus Time (Xh Ym) */}
         <motion.article
@@ -133,18 +133,18 @@ export function ScrollStatsView() {
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
           className={cn(
-            'will-change-transform rounded-2xl p-5',
+            'will-change-transform rounded-2xl p-3.5 sm:p-5',
             OBSIDIAN_CARD_CLASS,
           )}
         >
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span>Tempo Total no Tsukuyomi</span>
-            <Clock className="h-4 w-4 text-red-500" aria-hidden="true" />
+          <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-zinc-400">
+            <span className="truncate">Tempo Total no Tsukuyomi</span>
+            <Clock className="h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />
           </div>
-          <p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-zinc-100 tabular-nums sm:text-3xl">
+          <p className="mt-3 font-mono text-xl font-semibold tracking-tight text-zinc-100 tabular-nums sm:text-3xl">
             {formatHoursAndMinutes(stats.totalFocusMinutes)}
           </p>
-          <p className="mt-1.5 font-mono text-xs text-zinc-500 tabular-nums">
+          <p className="mt-1.5 font-mono text-[11px] sm:text-xs text-zinc-500 tabular-nums">
             {stats.completedSessions} ciclos concluídos ·{' '}
             {stats.susanooCompletedCount} com Susano&apos;o
           </p>
@@ -157,20 +157,20 @@ export function ScrollStatsView() {
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
           className={cn(
-            'will-change-transform rounded-2xl p-5',
+            'will-change-transform rounded-2xl p-3.5 sm:p-5',
             OBSIDIAN_CARD_CLASS,
           )}
         >
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span>Chakra Total &amp; Estágio Ocular</span>
-            <Sparkles className="h-4 w-4 text-red-500" aria-hidden="true" />
+          <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-zinc-400">
+            <span className="truncate">Chakra Total &amp; Olho</span>
+            <Sparkles className="h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />
           </div>
-          <p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-red-400 tabular-nums sm:text-3xl">
+          <p className="mt-3 font-mono text-xl font-semibold tracking-tight text-red-400 tabular-nums sm:text-3xl">
             {chakra.toLocaleString('pt-BR')}
           </p>
-          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-zinc-300">
-            <Eye className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
-            <span>{currentEyeDef.name}</span>
+          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] sm:text-xs text-zinc-300">
+            <Eye className="h-3.5 w-3.5 shrink-0 text-red-500" aria-hidden="true" />
+            <span className="truncate">{currentEyeDef.name}</span>
           </p>
         </motion.article>
 
@@ -181,25 +181,25 @@ export function ScrollStatsView() {
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
           className={cn(
-            'will-change-transform rounded-2xl p-5',
+            'will-change-transform rounded-2xl p-3.5 sm:p-5',
             OBSIDIAN_CARD_CLASS,
           )}
         >
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span>Ofensiva Diária (Streak)</span>
+          <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-zinc-400">
+            <span className="truncate">Ofensiva Diária</span>
             <Flame
               className={cn(
-                'h-4 w-4',
+                'h-4 w-4 shrink-0',
                 streak > 0 ? 'text-red-500' : 'text-zinc-600',
               )}
               aria-hidden="true"
             />
           </div>
-          <p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-zinc-100 tabular-nums sm:text-3xl">
+          <p className="mt-3 font-mono text-xl font-semibold tracking-tight text-zinc-100 tabular-nums sm:text-3xl">
             {streak} {streak === 1 ? 'dia' : 'dias'}
           </p>
-          <p className="mt-1.5 font-mono text-xs text-zinc-500 tabular-nums">
-            Recorde histórico: {longestStreak}{' '}
+          <p className="mt-1.5 font-mono text-[11px] sm:text-xs text-zinc-500 tabular-nums">
+            Recorde: {longestStreak}{' '}
             {longestStreak === 1 ? 'dia' : 'dias'}
           </p>
         </motion.article>
@@ -211,18 +211,18 @@ export function ScrollStatsView() {
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
           className={cn(
-            'will-change-transform rounded-2xl p-5',
+            'will-change-transform rounded-2xl p-3.5 sm:p-5',
             OBSIDIAN_CARD_CLASS,
           )}
         >
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span>Precisão Uchiha</span>
-            <Crosshair className="h-4 w-4 text-red-500" aria-hidden="true" />
+          <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-zinc-400">
+            <span className="truncate">Precisão Uchiha</span>
+            <Crosshair className="h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />
           </div>
-          <p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-zinc-100 tabular-nums sm:text-3xl">
+          <p className="mt-3 font-mono text-xl font-semibold tracking-tight text-zinc-100 tabular-nums sm:text-3xl">
             {stats.accuracyPercent}%
           </p>
-          <p className="mt-1.5 font-mono text-xs text-zinc-500 tabular-nums">
+          <p className="mt-1.5 font-mono text-[11px] sm:text-xs text-zinc-500 tabular-nums">
             {stats.completedSessions} íntegros · {stats.abandonedSessions}{' '}
             abandonados
           </p>
@@ -235,19 +235,19 @@ export function ScrollStatsView() {
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
           className={cn(
-            'will-change-transform rounded-2xl p-5',
+            'will-change-transform rounded-2xl p-3.5 sm:p-5',
             OBSIDIAN_CARD_CLASS,
           )}
         >
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span>Invocações do Izanagi</span>
-            <RefreshCw className="h-4 w-4 text-red-500" aria-hidden="true" />
+          <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-zinc-400">
+            <span className="truncate">Invocações do Izanagi</span>
+            <RefreshCw className="h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />
           </div>
-          <p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-zinc-100 tabular-nums sm:text-3xl">
+          <p className="mt-3 font-mono text-xl font-semibold tracking-tight text-zinc-100 tabular-nums sm:text-3xl">
             {izanagi.totalTimesUsed}
           </p>
-          <p className="mt-1.5 font-mono text-xs text-zinc-500 tabular-nums">
-            {activeEyesCount}/2 olhos ativos para reescrever a realidade
+          <p className="mt-1.5 font-mono text-[11px] sm:text-xs text-zinc-500 tabular-nums">
+            {activeEyesCount}/2 olhos ativos
           </p>
         </motion.article>
 
@@ -257,7 +257,7 @@ export function ScrollStatsView() {
           whileTap={kpiTap}
           transition={KPI_SPRING}
           onMouseEnter={() => audioEngine.playHover()}
-          className="amaterasu-frame will-change-transform relative overflow-hidden rounded-2xl border border-red-600/45 bg-gradient-to-b from-[#140709]/92 via-[#090406]/96 to-[#000000]/98 p-5 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] hover:border-red-500/60 transition-colors"
+          className="amaterasu-frame will-change-transform relative overflow-hidden rounded-2xl border border-red-600/45 bg-gradient-to-b from-[#140709]/92 via-[#090406]/96 to-[#000000]/98 p-3.5 sm:p-5 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] hover:border-red-500/60 transition-colors xl:col-span-5"
         >
           <div
             aria-hidden="true"
@@ -274,14 +274,14 @@ export function ScrollStatsView() {
           </div>
 
           <div className="relative z-10">
-            <div className="flex items-center justify-between text-xs text-zinc-300">
-              <span>Missões Amaterasu Concluídas</span>
-              <Flame className="h-4 w-4 text-[#DC2626]" aria-hidden="true" />
+            <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-zinc-300">
+              <span className="truncate">Missões Amaterasu</span>
+              <Flame className="h-4 w-4 shrink-0 text-[#DC2626]" aria-hidden="true" />
             </div>
-            <p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-white tabular-nums sm:text-3xl">
+            <p className="mt-3 font-mono text-xl font-semibold tracking-tight text-white tabular-nums sm:text-3xl">
               {stats.amaterasuCompletedCount}
             </p>
-            <p className="mt-1.5 text-xs text-red-400/90">
+            <p className="mt-1.5 text-[11px] sm:text-xs text-red-400/90">
               Chamas negras seladas com bônus 2.0x
             </p>
           </div>
