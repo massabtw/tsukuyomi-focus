@@ -56,4 +56,21 @@ public sealed class ProfileController : ControllerBase
         var result = await _profileService.DevSimulateAsync(request, cancellationToken);
         return result.ToActionResult(this);
     }
+
+    /// <summary>
+    /// Gera um Mangekyou Sharingan customizado via Groq AI (SVG vetorial + prompt raster + lore do Doujutsu) com suporte a análise de imagem base via Vision e opção de equipar automaticamente no perfil.
+    /// </summary>
+    [HttpPost("generate-sharingan")]
+    [HttpPost("ai-sharingan")]
+    [ProducesResponseType(typeof(GenerateSharinganResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GenerateSharingan(
+        [FromServices] IProfileAppService profileService,
+        [FromBody] GenerateSharinganRequestDto? request,
+        CancellationToken cancellationToken)
+    {
+        var result = await profileService.GenerateCustomSharinganAsync(request!, cancellationToken);
+        return result.ToActionResult(this);
+    }
 }

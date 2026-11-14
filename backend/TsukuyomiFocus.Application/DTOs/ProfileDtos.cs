@@ -64,3 +64,25 @@ public class DevSimulateRequest
     public int? SetVisualBlurLevel { get; set; }
     public int? SetCurrentStreak { get; set; }
 }
+
+public class GenerateSharinganRequestDto
+{
+    public string? Prompt { get; set; }
+    public string? BaseEyeImageBase64 { get; set; }
+    public string StyleVariant { get; set; } = "itachi";
+    public string OutputFormat { get; set; } = "svg";
+    public bool AutoEquip { get; set; } = true;
+}
+
+public class GenerateSharinganResponseDto
+{
+    public string DoujutsuName { get; set; } = string.Empty;
+    public string LoreDescription { get; set; } = string.Empty;
+    public string RawSvgCode { get; set; } = string.Empty;
+    public string SvgDataUri { get; set; } = string.Empty;
+    public string RasterImageUrl { get; set; } = string.Empty;
+    public string PrimaryGlowColor { get; set; } = "#DC2626";
+    public string EquippedImageUrl { get; set; } = string.Empty;
+    public bool AutoEquipped { get; set; }
+    public ProfileDto? Profile { get; set; }
+}

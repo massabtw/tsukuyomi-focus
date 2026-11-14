@@ -1,6 +1,7 @@
 using System.Globalization;
 using TsukuyomiFocus.Application.DTOs;
 using TsukuyomiFocus.Domain.Entities;
+using TsukuyomiFocus.Domain.ValueObjects;
 
 namespace TsukuyomiFocus.Application.Mappers;
 
@@ -83,6 +84,28 @@ public static class ProfileMapper
             AmaterasuPenaltyChakra = amaterasuPenaltyChakra,
             ExpiredAmaterasuMissions = expiredAmaterasuMissions ?? Array.Empty<string>(),
             Profile = profile.ToProfileDto()
+        };
+    }
+
+    public static GenerateSharinganResponseDto ToGenerateSharinganResponseDto(
+        this GeneratedSharinganResult result,
+        string equippedImageUrl,
+        bool autoEquipped,
+        UserProfile? profile = null)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        return new GenerateSharinganResponseDto
+        {
+            DoujutsuName = result.DoujutsuName,
+            LoreDescription = result.LoreDescription,
+            RawSvgCode = result.RawSvgCode,
+            SvgDataUri = result.SvgDataUri,
+            RasterImageUrl = result.RasterImageUrl,
+            PrimaryGlowColor = result.PrimaryGlowColor,
+            EquippedImageUrl = equippedImageUrl,
+            AutoEquipped = autoEquipped,
+            Profile = profile?.ToProfileDto()
         };
     }
 

@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using Microsoft.Extensions.Logging;
 using TsukuyomiFocus.Application.Common;
 using TsukuyomiFocus.Application.DTOs;
 using TsukuyomiFocus.Application.Interfaces;
@@ -7,6 +8,8 @@ using TsukuyomiFocus.Application.Mappers;
 using TsukuyomiFocus.Domain.Entities;
 using TsukuyomiFocus.Domain.Exceptions;
 using TsukuyomiFocus.Domain.Interfaces;
+using TsukuyomiFocus.Domain.Interfaces.Services;
+using TsukuyomiFocus.Domain.ValueObjects;
 
 namespace TsukuyomiFocus.Application.Services;
 
@@ -18,13 +21,19 @@ public sealed class ProfileAppService : IProfileAppService
 
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IProfileRepository _profileRepository;
+    private readonly ISharinganAiGeneratorService _sharinganAiGeneratorService;
+    private readonly ILogger<ProfileAppService> _logger;
 
     public ProfileAppService(
         IDbConnectionFactory connectionFactory,
-        IProfileRepository profileRepository)
+        IProfileRepository profileRepository,
+        ISharinganAiGeneratorService sharinganAiGeneratorService,
+        ILogger<ProfileAppService> logger)
     {
         _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
         _profileRepository = profileRepository ?? throw new ArgumentNullException(nameof(profileRepository));
+        _sharinganAiGeneratorService = sharinganAiGeneratorService ?? throw new ArgumentNullException(nameof(sharinganAiGeneratorService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public Task<ServiceResult<AppStateResponseDto>> GetFullStateAsync(CancellationToken cancellationToken = default)
@@ -131,6 +140,139 @@ public sealed class ProfileAppService : IProfileAppService
             return ServiceResult<AppStateResponseDto>.Ok(
                 profile.ToAppStateDto(missions, recentLogs));
         }, cancellationToken);
+    }
+
+    public async Task<ServiceResult<GenerateSharinganResponseDto>> GenerateCustomSharinganAsync(
+        GenerateSharinganRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request is null)
+        {
+            return ServiceResult<GenerateSharinganResponseDto>.BadRequest(
+                "Corpo da requisição inválido.",
+                "INVALID_REQUEST");
+        }
+
+        var normalizedVariant = string.IsNullOrWhiteSpace(request.StyleVariant)
+            ? LoreRules.MangekyouVariants.Itachi
+            : request.StyleVariant.Trim().ToLowerInvariant();
+
+        if (!string.Equals(normalizedVariant, "custom", StringComparison.Ordinal) &&
+            !LoreRules.MangekyouVariants.IsValid(normalizedVariant))
+        {
+            return ServiceResult<GenerateSharinganResponseDto>.BadRequest(
+                $"Variante de estilo '{request.StyleVariant}' inválida. Valores aceitos: itachi, sasuke, shisui, obito, madara, custom.",
+                "INVALID_STYLE_VARIANT");
+        }
+
+        var normalizedOutputFormat = string.IsNullOrWhiteSpace(request.OutputFormat)
+            ? "svg"
+            : request.OutputFormat.Trim().ToLowerInvariant();
+
+        if (normalizedOutputFormat is not ("svg" or "raster"))
+        {
+            return ServiceResult<GenerateSharinganResponseDto>.BadRequest(
+                $"Formato de saída '{request.OutputFormat}' inválido. Use 'svg' ou 'raster'.",
+                "INVALID_OUTPUT_FORMAT");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.BaseEyeImageBase64))
+        {
+            var trimmedImage = request.BaseEyeImageBase64.Trim();
+            if (trimmedImage.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase) ||
+                trimmedImage.StartsWith("vbscript:", StringComparison.OrdinalIgnoreCase))
+            {
+                return ServiceResult<GenerateSharinganResponseDto>.BadRequest(
+                    "Imagem base inválida.",
+                    "INVALID_BASE_EYE_IMAGE");
+            }
+        }
+
+        GeneratedSharinganResult generated;
+        try
+        {
+            generated = await _sharinganAiGeneratorService.GenerateSharinganAsync(
+                request.Prompt,
+                request.BaseEyeImageBase64,
+                normalizedVariant,
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar Sharingan via IA para variante {StyleVariant}.", normalizedVariant);
+            return ServiceResult<GenerateSharinganResponseDto>.BadRequest(
+                "Não foi possível gerar o Sharingan customizado no momento.",
+                "AI_GENERATION_FAILED");
+        }
+
+        var safeResult = EnsureValidSvgResult(generated, normalizedVariant);
+        var equippedImageUrl = string.Equals(normalizedOutputFormat, "raster", StringComparison.Ordinal) &&
+                               !string.IsNullOrWhiteSpace(safeResult.RasterImageUrl)
+            ? safeResult.RasterImageUrl
+            : safeResult.SvgDataUri;
+
+        if (!request.AutoEquip)
+        {
+            return ServiceResult<GenerateSharinganResponseDto>.Ok(
+                safeResult.ToGenerateSharinganResponseDto(equippedImageUrl, false));
+        }
+
+        var variantToEquip = LoreRules.MangekyouVariants.IsValid(normalizedVariant)
+            ? normalizedVariant
+            : null;
+
+        return await ExecuteInProfileTransactionAsync(async (profile, connection, transaction, _, nowUtc) =>
+        {
+            profile.CustomizeEyes(
+                equippedEyeStage: null,
+                mangekyouVariant: variantToEquip,
+                customEyeImageUrl: equippedImageUrl,
+                clearCustomEyeImage: false,
+                nowUtc: nowUtc);
+
+            await _profileRepository.UpdateAsync(profile, connection, transaction, cancellationToken);
+
+            return ServiceResult<GenerateSharinganResponseDto>.Ok(
+                safeResult.ToGenerateSharinganResponseDto(equippedImageUrl, true, profile));
+        }, cancellationToken);
+    }
+
+    private GeneratedSharinganResult EnsureValidSvgResult(
+        GeneratedSharinganResult result,
+        string styleVariant)
+    {
+        if (SharinganSvgHelper.TryValidateAndSanitize(result.RawSvgCode, out var sanitizedSvg))
+        {
+            var dataUri = string.IsNullOrWhiteSpace(result.SvgDataUri)
+                ? SharinganSvgHelper.ToSvgDataUri(sanitizedSvg)
+                : result.SvgDataUri;
+
+            return result with
+            {
+                RawSvgCode = sanitizedSvg,
+                SvgDataUri = dataUri,
+                PrimaryGlowColor = SharinganSvgHelper.NormalizeHexColor(result.PrimaryGlowColor)
+            };
+        }
+
+        _logger.LogWarning(
+            "SVG retornado pelo provedor de IA estava inválido ou malformado para {StyleVariant}; aplicando fallback simétrico seguro.",
+            styleVariant);
+
+        var glowColor = SharinganSvgHelper.NormalizeHexColor(result.PrimaryGlowColor);
+        var fallbackSvg = SharinganSvgHelper.BuildFallbackSvg(styleVariant, glowColor);
+        SharinganSvgHelper.TryValidateAndSanitize(fallbackSvg, out var sanitizedFallback);
+
+        return result with
+        {
+            RawSvgCode = sanitizedFallback,
+            SvgDataUri = SharinganSvgHelper.ToSvgDataUri(sanitizedFallback),
+            PrimaryGlowColor = glowColor
+        };
     }
 
     private async Task<ServiceResult<T>> ExecuteInProfileTransactionAsync<T>(

@@ -16,4 +16,8 @@ public interface IProfileAppService
     Task<ServiceResult<AppStateResponseDto>> DevSimulateAsync(
         DevSimulateRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<ServiceResult<GenerateSharinganResponseDto>> GenerateCustomSharinganAsync(
+        GenerateSharinganRequestDto request,
+        CancellationToken cancellationToken = default);
 }
