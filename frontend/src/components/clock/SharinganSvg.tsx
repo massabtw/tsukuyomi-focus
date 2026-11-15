@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useId } from 'react';
+import { useEffect, useId } from 'react';
 import {
   motion,
   useAnimate,
@@ -178,7 +178,7 @@ function MangekyouPattern({
   }
 }
 
-export const SharinganSvg = memo(function SharinganSvg({
+export function SharinganSvg({
   stage,
   variant = 'itachi',
   className,
@@ -241,10 +241,7 @@ export const SharinganSvg = memo(function SharinganSvg({
       viewBox="0 0 200 200"
       role="img"
       aria-label={label}
-      className={cn(
-        'h-full w-full object-cover object-center origin-center select-none',
-        className,
-      )}
+      className={cn('h-full w-full select-none', className)}
     >
       <defs>
         <radialGradient id={irisGradId} cx="50%" cy="50%" r="50%">
@@ -275,7 +272,7 @@ export const SharinganSvg = memo(function SharinganSvg({
       </defs>
 
       {/* Base Iris */}
-      <circle cx="100" cy="100" r="96" fill={irisFill} />
+      <circle cx="100" cy="100" r="93" fill={irisFill} />
 
       {/* Subtle Organic Iris Striations */}
       {!isRinnegan && (
@@ -383,11 +380,11 @@ export const SharinganSvg = memo(function SharinganSvg({
       )}
 
       {/* Spherical Limbal Shading & Dark Limbal Ring */}
-      <circle cx="100" cy="100" r="96" fill={`url(#${shadowGradId})`} />
+      <circle cx="100" cy="100" r="93" fill={`url(#${shadowGradId})`} />
       <circle
         cx="100"
         cy="100"
-        r="96"
+        r="93"
         fill="none"
         stroke="#09090B"
         strokeWidth="6"
@@ -459,4 +456,4 @@ export const SharinganSvg = memo(function SharinganSvg({
       )}
     </svg>
   );
-});
+}

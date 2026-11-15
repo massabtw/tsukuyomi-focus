@@ -75,7 +75,6 @@ class TsukuyomiAudioEngine {
   private gestureListenersBound = false;
   private lastHoverTimeMs = 0;
   private lastEyeSoundTimeMs = 0;
-  private customPitchRate = 1.0;
 
   private lastSettings: AudioSettings = {
     muted: false,
@@ -562,14 +561,6 @@ class TsukuyomiAudioEngine {
       if (canReuseTemplate) {
         player.currentTime = 0;
       }
-      const isOcularSfx =
-        id === 'sharingan-activate' ||
-        id === 'mangekyou-awaken' ||
-        id === 'rinnegan-awaken' ||
-        id === 'tsukuyomi-cast' ||
-        id === 'amaterasu-ignite' ||
-        id === 'susanoo-summon';
-      player.playbackRate = isOcularSfx ? this.customPitchRate : 1.0;
       player.volume = Math.min(1, Math.max(0, effectiveVolume));
       await player.play();
       return true;
@@ -695,14 +686,6 @@ class TsukuyomiAudioEngine {
       if (ctx.state === 'running') {
         const source = ctx.createBufferSource();
         source.buffer = cached;
-        const isOcularSfx =
-          id === 'sharingan-activate' ||
-          id === 'mangekyou-awaken' ||
-          id === 'rinnegan-awaken' ||
-          id === 'tsukuyomi-cast' ||
-          id === 'amaterasu-ignite' ||
-          id === 'susanoo-summon';
-        source.playbackRate.value = isOcularSfx ? this.customPitchRate : 1.0;
 
         const gain = ctx.createGain();
         gain.gain.value = effectiveVolume;
@@ -747,11 +730,6 @@ class TsukuyomiAudioEngine {
       return;
     }
     return this.playInternal(id, volumeScale);
-  }
-
-  public setCustomPitchRate(rate: number): void {
-    const safeRate = Number.isFinite(rate) ? rate : 1.0;
-    this.customPitchRate = Math.min(1.3, Math.max(0.7, safeRate));
   }
 
   public async playEyeSound(stage: EyeStage): Promise<void> {

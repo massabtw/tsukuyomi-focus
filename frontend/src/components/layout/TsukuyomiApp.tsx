@@ -15,30 +15,17 @@ import { ScrollStatsView } from '@/components/scroll/ScrollStatsView';
 import { TempleView } from '@/components/clock/TempleView';
 import { useDailyChecks } from '@/hooks/useDailyChecks';
 import { useFocusTimer } from '@/hooks/useFocusTimer';
-import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
+import { getVisualBlurClass } from '@/lib/gamification';
 import {
-  useActiveOcularPowers,
   useActiveTab,
   useHasHydrated,
   useIsTsukuyomiMode,
-  useOcularJutsuState,
   useOcularProfile,
   useTimerCore,
   useTsukuyomiStore,
 } from '@/store/useTsukuyomiStore';
 import type { IzanagiTriggerContext, MangekyouVariant } from '@/types/tsukuyomi';
-
-function hexToRgbTuple(hex: string): string | null {
-  const clean = hex.trim().replace(/^#/, '');
-  if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
-    return null;
-  }
-  const r = Number.parseInt(clean.slice(0, 2), 16);
-  const g = Number.parseInt(clean.slice(2, 4), 16);
-  const b = Number.parseInt(clean.slice(4, 6), 16);
-  return `${r}, ${g}, ${b}`;
-}
 
 interface ChakraPalette {
   primary: string;
@@ -81,7 +68,7 @@ const UCHIHA_CHAKRA_PALETTES: Record<MangekyouVariant, ChakraPalette> = {
 };
 
 const DOLLY_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
-const WILL_CHANGE_TAB = { willChange: 'transform, opacity' } as const;
+const WILL_CHANGE_TAB = { willChange: 'transform, opacity, filter' } as const;
 
 function HydrationSkeleton() {
   return (
@@ -125,9 +112,7 @@ export function TsukuyomiApp() {
   const hasHydrated = useHasHydrated();
   const activeTab = useActiveTab();
   const isTsukuyomiMode = useIsTsukuyomiMode();
-  const { mangekyouVariant, customEye } = useOcularProfile();
-  const activeOcularPowers = useActiveOcularPowers();
-  const { tsukuyomiOverdriveActive } = useOcularJutsuState();
+  const { mangekyouVariant } = useOcularProfile();
   const { susanooEnabled, mode: timerMode } = useTimerCore();
   const visualBlurLevel = useTsukuyomiStore((state) => state.visualBlurLevel);
   const pendingIzanagiRescue = useTsukuyomiStore(
@@ -137,36 +122,12 @@ export function TsukuyomiApp() {
     (state) => state.declineStreakRescue,
   );
 
-  const basePalette =
+  const chakraPalette =
     UCHIHA_CHAKRA_PALETTES[mangekyouVariant] ?? UCHIHA_CHAKRA_PALETTES.itachi;
-  const customThemeHex =
-    customEye.enabled && activeOcularPowers?.visualThemeSignature.primaryGlowColor
-      ? activeOcularPowers.visualThemeSignature.primaryGlowColor
-      : null;
-  const customThemeRgb = customThemeHex ? hexToRgbTuple(customThemeHex) : null;
-
-  const chakraPalette: ChakraPalette =
-    customThemeHex && customThemeRgb
-      ? {
-          primary: customThemeHex,
-          glow: `rgba(${customThemeRgb}, 0.48)`,
-          rgb: customThemeRgb,
-        }
-      : basePalette;
-
   const isSusanooFocusActive = susanooEnabled && timerMode === 'focus';
-  const activeChakraGlow =
-    tsukuyomiOverdriveActive || isSusanooFocusActive
-      ? `rgba(${chakraPalette.rgb}, 0.65)`
-      : chakraPalette.glow;
-
-  useEffect(() => {
-    const pitch =
-      customEye.enabled && activeOcularPowers
-        ? activeOcularPowers.visualThemeSignature.audioPitchRate
-        : 1.0;
-    audioEngine.setCustomPitchRate(pitch);
-  }, [customEye.enabled, activeOcularPowers]);
+  const activeChakraGlow = isSusanooFocusActive
+    ? `rgba(${chakraPalette.rgb}, 0.58)`
+    : chakraPalette.glow;
 
   useEffect(() => {
     const rootStyle = document.documentElement.style;
@@ -220,10 +181,10 @@ export function TsukuyomiApp() {
         transition: { duration: 0 },
       }
     : {
-        initial: { opacity: 0, y: 8, scale: 0.985 },
-        animate: { opacity: 1, y: 0, scale: 1 },
-        exit: { opacity: 0, y: -6, scale: 0.99 },
-        transition: { duration: 0.35, ease: DOLLY_EASE },
+        initial: { opacity: 0, scale: 0.97, filter: 'blur(6px)' },
+        animate: { opacity: 1, scale: 1, filter: 'blur(0px)' },
+        exit: { opacity: 0, scale: 1.02, filter: 'blur(4px)' },
+        transition: { duration: 0.45, ease: DOLLY_EASE },
       };
 
   const chakraStyle: ChakraCssVars = {
@@ -238,7 +199,7 @@ export function TsukuyomiApp() {
       data-tsukuyomi={isTsukuyomiMode ? 'true' : 'false'}
       style={chakraStyle}
       className={cn(
-        'relative flex min-h-screen flex-col overflow-x-hidden transition-colors duration-700',
+        'relative flex min-h-screen flex-col transition-colors duration-700',
         isTsukuyomiMode
           ? 'tsukuyomi-mode bg-[#000000] text-white'
           : 'bg-[#09090B] text-[#FAFAFA]',
@@ -270,9 +231,16 @@ export function TsukuyomiApp() {
       <div className="relative z-10 flex min-h-screen flex-col">
         <NinjaHeader />
 
-        <TabNavigation />
+        <div
+          className={cn(
+            'transition-[filter] duration-300 hover:blur-none focus-within:blur-none',
+            visualBlurLevel > 0 ? getVisualBlurClass(visualBlurLevel) : null,
+          )}
+        >
+          <TabNavigation />
+        </div>
 
-        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-3 pb-24 pt-3 sm:px-6 sm:pt-6 lg:pb-12">
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-12 pt-4 sm:px-6 sm:pt-6">
           <AmaterasuPenaltyBanner />
 
           <AnimatePresence mode="wait">

@@ -201,13 +201,13 @@ export function NinjaHeader() {
           : 'border-t border-t-white/[0.08] border-b border-b-white/[0.06] bg-gradient-to-b from-[#141418]/90 via-[#0C0C0F]/95 to-[#070709]/98 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)]',
       )}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:gap-4 sm:px-5 lg:px-6 lg:py-3">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2.5 px-4 py-3 sm:px-6">
         {/* Brand Title */}
-        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-3">
           <div
             aria-hidden="true"
             className={cn(
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl transition-colors sm:h-9 sm:w-9',
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl transition-colors',
               isTsukuyomiMode
                 ? 'border-red-500/40 bg-black shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_0_18px_rgba(239,68,68,0.28)]'
                 : 'border-red-900/60 bg-gradient-to-b from-[#141418]/90 via-[#0C0C0F]/95 to-[#070709]/98 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_0_12px_rgba(127,29,29,0.35)]',
@@ -234,28 +234,22 @@ export function NinjaHeader() {
           </div>
 
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="truncate font-display text-xs font-semibold tracking-[0.18em] text-zinc-100 uppercase sm:text-base sm:tracking-[0.22em]">
+            <div className="flex items-center gap-2">
+              <span className="font-display text-sm font-semibold tracking-[0.22em] text-zinc-100 uppercase sm:text-base">
                 Tsukuyomi
               </span>
-              <span className="hidden rounded border border-red-900/60 bg-red-950/35 px-1.5 py-0.5 font-mono text-[10px] font-medium tracking-widest text-red-400 uppercase sm:inline-block">
+              <span className="rounded border border-red-900/60 bg-red-950/35 px-1.5 py-0.5 font-mono text-[10px] font-medium tracking-widest text-red-400 uppercase">
                 Focus
               </span>
             </div>
-            <p className="truncate text-[10px] font-medium tracking-wide text-zinc-400 lg:hidden">
-              {stageInfo.currentDefinition.name} ·{' '}
-              <span className="font-mono text-zinc-300 tabular-nums">
-                {chakra.toLocaleString('pt-BR')} XP
-              </span>
-            </p>
-            <p className="hidden text-[11px] tracking-wide text-zinc-500 lg:block">
+            <p className="hidden text-[11px] tracking-wide text-zinc-500 sm:block">
               Santuário Naka · Disciplina Ocular Uchiha
             </p>
           </div>
         </div>
 
-        {/* Center: EyeStage Badge + Liquid Chakra Progress (Desktop) */}
-        <div className="hidden lg:flex lg:min-w-[290px] lg:items-center lg:gap-3">
+        {/* Center: EyeStage Badge + Liquid Chakra Progress */}
+        <div className="order-3 flex w-full items-center gap-3 border-t border-white/[0.05] pt-2 lg:order-2 lg:w-auto lg:min-w-[290px] lg:border-t-0 lg:pt-0">
           <div className="w-full space-y-1.5">
             <div className="flex items-center justify-between gap-3 text-xs">
               <span className="inline-flex items-center gap-1.5 font-medium text-zinc-200">
@@ -409,26 +403,12 @@ export function NinjaHeader() {
         </div>
 
         {/* Right: Streak, Izanagi Eyes, Acuity, Tsukuyomi Toggle */}
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-          {/* Mobile/Tablet Quick Chakra Pill */}
-          <div
-            title={`${stageInfo.currentDefinition.name} · ${chakra.toLocaleString('pt-BR')} Chakra`}
-            className={cn(
-              'hidden items-center gap-1 rounded-lg px-2 py-1 text-xs sm:flex lg:hidden',
-              OBSIDIAN_CHIP_CLASS,
-            )}
-          >
-            <Sparkles className="h-3 w-3 text-red-500" aria-hidden="true" />
-            <span className="font-mono font-medium text-zinc-200 tabular-nums">
-              {chakra.toLocaleString('pt-BR')}
-            </span>
-          </div>
-
+        <div className="order-2 flex items-center gap-2 sm:gap-2.5 lg:order-3">
           {/* Streak Counter Chip */}
           <div
             title={`Ofensiva atual: ${streak} dia(s) · Recorde: ${longestStreak} dia(s)`}
             className={cn(
-              'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs sm:gap-1.5 sm:px-2.5',
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs',
               OBSIDIAN_CHIP_CLASS,
             )}
           >
@@ -444,8 +424,8 @@ export function NinjaHeader() {
             </span>
           </div>
 
-          {/* Left & Right Izanagi Eye Indicators with interactive tooltip (hidden on < md) */}
-          <div className="group relative hidden md:block">
+          {/* Left & Right Izanagi Eye Indicators with interactive tooltip */}
+          <div className="group relative">
             <button
               type="button"
               onMouseEnter={() => audioEngine.playHover()}
@@ -522,11 +502,11 @@ export function NinjaHeader() {
             </div>
           </div>
 
-          {/* Visual Acuity Badge (hidden on < md) */}
+          {/* Visual Acuity Badge */}
           <div
             title={`Acuidade Visual: ${acuityPercent}% (nível de desgaste ${visualBlurLevel}/3)`}
             className={cn(
-              'hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs md:flex',
+              'hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs sm:flex',
               acuityPercent === 100
                 ? cn(OBSIDIAN_CHIP_CLASS, 'text-zinc-300')
                 : 'border border-red-900/60 bg-gradient-to-b from-red-950/50 via-[#160507]/95 to-[#090304]/98 text-red-300 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_25px_50px_-12px_rgba(0,0,0,0.95)] hover:border-red-500/40 transition-colors',

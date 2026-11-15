@@ -91,106 +91,6 @@ export interface CustomEyeConfig {
   glowIntensity: number;
 }
 
-export type SharinganOutputFormat =
-  | 'anime_svg'
-  | 'photo_lens'
-  | 'svg'
-  | 'raster';
-
-export type OcularRarity = 'Rank A' | 'Rank S' | 'Rank SS - Divino';
-
-export type LeftEyePassiveType =
-  | 'CHAKRA_MULTIPLIER'
-  | 'AMATERASU_MASTERY'
-  | 'IZANAGI_REGEN'
-  | 'TIME_DILATION'
-  | 'VISUAL_IMMUNITY';
-
-export type RightEyeActiveJutsuType =
-  | 'KAMUI_SKIP'
-  | 'TSUKUYOMI_OVERDRIVE'
-  | 'KOTOAMATSUKAMI_COMPLETE'
-  | 'SHINRA_TENSEI_PURGE';
-
-export interface LeftEyePassive {
-  type: LeftEyePassiveType;
-  name: string;
-  description: string;
-  bonusValue: number;
-}
-
-export interface RightEyeActiveJutsu {
-  type: RightEyeActiveJutsuType;
-  name: string;
-  description: string;
-  cooldownCycles: number;
-}
-
-export interface VisualThemeSignature {
-  primaryGlowColor: string;
-  secondaryColor: string;
-  audioPitchRate: number;
-}
-
-export interface OcularPowers {
-  rarity: OcularRarity;
-  leftEyePassive: LeftEyePassive;
-  rightEyeActiveJutsu: RightEyeActiveJutsu;
-  visualThemeSignature: VisualThemeSignature;
-}
-
-export interface ForgedEyeItem {
-  id: string;
-  doujutsuName: string;
-  loreDescription: string;
-  detectedMood: string;
-  svgDataUri: string;
-  compositeDataUrl: string | null;
-  primaryCrimsonHex: string;
-  secondaryDarkHex: string;
-  patternType: string;
-  centerShape: string;
-  bladeStyle: string;
-  bladeCount: number;
-  outerRingStyle: string;
-  hasAmaterasuFlames: boolean;
-  ocularPowers: OcularPowers;
-  createdAt: string;
-}
-
-export interface GeneratedSharinganLore {
-  doujutsuName: string;
-  loreDescription: string;
-  detectedMood: string;
-  eyeCenterX: number;
-  eyeCenterY: number;
-  irisRadiusRatio: number;
-  bladeCount: number;
-  patternType: string;
-  centerShape: string;
-  bladeStyle: string;
-  outerRingStyle: string;
-  primaryCrimsonHex: string;
-  secondaryDarkHex: string;
-  hasAmaterasuFlames: boolean;
-  rotationOffset: number;
-  rawSvgCode: string;
-  svgDataUri: string;
-  rasterImageUrl: string;
-  primaryGlowColor: string;
-  equippedImageUrl: string;
-  outputFormat: SharinganOutputFormat;
-  ocularPowers: OcularPowers;
-}
-
-export interface GenerateSharinganInput {
-  prompt?: string;
-  baseEyeImageBase64?: string | null;
-  styleVariant?: MangekyouVariant | 'custom';
-  outputFormat?: SharinganOutputFormat;
-  autoEquip?: boolean;
-}
-
 export interface AudioSettings {
   muted: boolean;
   sfxVolume: number;
@@ -294,15 +194,6 @@ export interface TsukuyomiState {
   izanagiFlashNonce: number;
   tsukuyomiCastNonce: number;
   ocularSpinBurstNonce: number;
-  backendConnected: boolean;
-  isGeneratingSharingan: boolean;
-  lastGeneratedSharingan: GeneratedSharinganLore | null;
-  forgedEyesInventory: ForgedEyeItem[];
-  equippedForgedEyeId: string | null;
-  activeOcularPowers: OcularPowers | null;
-  tsukuyomiOverdriveActive: boolean;
-  activeJutsuCooldownCyclesRemaining: number;
-  activeJutsuUsedInCurrentCycle: boolean;
 }
 
 export interface TsukuyomiActions {
@@ -354,14 +245,6 @@ export interface TsukuyomiActions {
   triggerTsukuyomiCastCutscene: () => void;
   dismissPendingAwakening: () => void;
   updateCustomEye: (patch: Partial<CustomEyeConfig>) => void;
-  syncFromBackend: () => Promise<void>;
-  generateCustomSharinganWithAi: (
-    input: GenerateSharinganInput,
-  ) => Promise<GeneratedSharinganLore>;
-  addForgedEyeToInventory: (item: ForgedEyeItem, autoEquip?: boolean) => void;
-  equipForgedEye: (id: string) => void;
-  deleteForgedEye: (id: string) => void;
-  invokeRightEyeJutsu: () => { ok: boolean; message: string };
 
   updateAudioSettings: (patch: Partial<AudioSettings>) => void;
 

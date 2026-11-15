@@ -1,11 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import {
-  createJSONStorage,
-  persist,
-  type StateStorage,
-} from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 import { EYE_STAGE_MAP } from '@/constants/evolution';
 import {
@@ -13,25 +9,6 @@ import {
   RANK_DEFINITIONS,
 } from '@/constants/ranks';
 import { createInitialSeedState } from '@/constants/seed';
-import {
-  abandonBackendSession,
-  completeBackendSession,
-  createBackendMission,
-  deleteBackendMission,
-  fetchFullState,
-  generateAiSharingan,
-  isValidGuid,
-  patchBackendMissionStatus,
-  patchEyeCustomization,
-  postDevSimulate,
-  toggleBackendMissionAmaterasu,
-  updateBackendMission,
-  type ApiFocusSessionLogDto,
-  type ApiGenerateSharinganResponseDto,
-  type ApiIzanagiDto,
-  type ApiMissionDto,
-  type ApiProfileDto,
-} from '@/lib/apiClient';
 import { audioEngine } from '@/lib/audioEngine';
 import {
   addDays,
@@ -55,15 +32,10 @@ import type {
   CustomEyeConfig,
   EyeStage,
   FocusSessionLog,
-  ForgedEyeItem,
-  GeneratedSharinganLore,
-  GenerateSharinganInput,
   IzanagiTriggerContext,
-  LeftEyePassive,
   MangekyouVariant,
   Mission,
   MissionStatus,
-  OcularPowers,
   SusanooStageOverride,
   TimerMode,
   TsukuyomiState,
@@ -71,135 +43,11 @@ import type {
   VisualBlurLevel,
 } from '@/types/tsukuyomi';
 
-function getActivePassive(state: TsukuyomiState): LeftEyePassive | null {
-  if (!state.customEye.enabled || !state.activeOcularPowers) {
-    return null;
-  }
-  return state.activeOcularPowers.leftEyePassive;
-}
-
-function normalizeOcularPowersFromResponse(
-  response: ApiGenerateSharinganResponseDto,
-): OcularPowers {
-  const powers = response.ocularPowers;
-  const fallbackColor =
-    powers?.visualThemeSignature?.primaryGlowColor ||
-    response.primaryGlowColor ||
-    response.primaryCrimsonHex ||
-    '#DC2626';
-  const fallbackSecondary =
-    powers?.visualThemeSignature?.secondaryColor ||
-    response.secondaryDarkHex ||
-    '#450A0A';
-
-  return {
-    rarity: powers?.rarity ?? 'Rank S',
-    leftEyePassive: {
-      type: powers?.leftEyePassive?.type ?? 'CHAKRA_MULTIPLIER',
-      name: powers?.leftEyePassive?.name ?? 'Sifão Carmesim de Chakra',
-      description:
-        powers?.leftEyePassive?.description ??
-        'Amplifica o ganho total de Chakra ao concluir qualquer ciclo de foco.',
-      bonusValue: powers?.leftEyePassive?.bonusValue ?? 1.25,
-    },
-    rightEyeActiveJutsu: {
-      type: powers?.rightEyeActiveJutsu?.type ?? 'TSUKUYOMI_OVERDRIVE',
-      name:
-        powers?.rightEyeActiveJutsu?.name ?? 'Sobrecarga do Tsukuyomi Infinito',
-      description:
-        powers?.rightEyeActiveJutsu?.description ??
-        'Dobra o ganho de Chakra e intensifica o selo ocular durante o ciclo.',
-      cooldownCycles: powers?.rightEyeActiveJutsu?.cooldownCycles ?? 1,
-    },
-    visualThemeSignature: {
-      primaryGlowColor: fallbackColor,
-      secondaryColor: fallbackSecondary,
-      audioPitchRate: powers?.visualThemeSignature?.audioPitchRate ?? 1.0,
-    },
-  };
-}
-
 function generateId(prefix: string): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return `${prefix}-${crypto.randomUUID()}`;
   }
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function runBackendSync(task: () => Promise<void>): void {
-  void task().catch(() => {
-    // Graceful offline fallback when backend API is unavailable
-  });
-}
-
-function mapApiMission(dto: ApiMissionDto): Mission {
-  return {
-    id: dto.id,
-    title: dto.title,
-    description: dto.description ?? '',
-    rank: dto.rank,
-    status: dto.status,
-    estimatedMinutes: dto.estimatedMinutes,
-    completedMinutes: dto.completedMinutes,
-    isAmaterasu: dto.isAmaterasu,
-    amaterasuDate: dto.amaterasuDate,
-    createdAt: dto.createdAt,
-    completedAt: dto.completedAt,
-  };
-}
-
-function mapApiLog(dto: ApiFocusSessionLogDto): FocusSessionLog {
-  return {
-    id: dto.id,
-    missionId: dto.missionId,
-    missionTitle: dto.missionTitle ?? 'Treino Livre no Tsukuyomi',
-    rank: dto.rank ?? 'D',
-    durationMinutes: dto.durationMinutes,
-    chakraEarned: dto.chakraEarned,
-    wasCompleted: dto.wasCompleted,
-    usedSusanoo: dto.wasSusanooActive,
-    isAmaterasu: false,
-    timestamp: dto.timestamp,
-    date: dto.date,
-  };
-}
-
-function clampVisualBlur(level: number): VisualBlurLevel {
-  return Math.max(0, Math.min(3, Math.round(level))) as VisualBlurLevel;
-}
-
-function mapApiProfilePatch(
-  profile: ApiProfileDto,
-  currentCustomEye: CustomEyeConfig,
-  izanagi?: ApiIzanagiDto,
-): Partial<TsukuyomiState> {
-  const hasCustomImage = Boolean(profile.customEyeImageUrl);
-  const patch: Partial<TsukuyomiState> = {
-    chakra: profile.totalChakra,
-    currentEyeStage: profile.currentEyeStage,
-    equippedEyeStage: profile.equippedEyeStage,
-    mangekyouVariant: profile.mangekyouVariant,
-    visualBlurLevel: clampVisualBlur(profile.visualBlurLevel),
-    streak: profile.currentStreak,
-    longestStreak: profile.bestStreak,
-    lastFocusDate: profile.lastFocusDate,
-    customEye: {
-      ...currentCustomEye,
-      imageDataUrl: profile.customEyeImageUrl,
-      enabled: hasCustomImage ? true : currentCustomEye.enabled && hasCustomImage,
-    },
-  };
-
-  if (izanagi) {
-    patch.izanagi = {
-      leftEyeBlind: izanagi.leftEyeBlind,
-      rightEyeBlind: izanagi.rightEyeBlind,
-      restorationProgressMinutes: izanagi.restorationProgressMinutes,
-      totalTimesUsed: izanagi.totalTimesUsed,
-    };
-  }
-
-  return patch;
 }
 
 function getDefaultDurationSecondsForMode(
@@ -215,30 +63,7 @@ function getDefaultDurationSecondsForMode(
 }
 
 const PERSIST_STORAGE_KEY = 'tsukuyomi-focus-storage';
-const PERSIST_VERSION = 3;
-
-function createDeduplicatedStorage(): StateStorage {
-  let lastPersistedValue: string | null = null;
-  return {
-    getItem: (name: string) => {
-      if (typeof window === 'undefined') return null;
-      const value = window.localStorage.getItem(name);
-      lastPersistedValue = value;
-      return value;
-    },
-    setItem: (name: string, value: string) => {
-      if (typeof window === 'undefined') return;
-      if (value === lastPersistedValue) return;
-      lastPersistedValue = value;
-      window.localStorage.setItem(name, value);
-    },
-    removeItem: (name: string) => {
-      if (typeof window === 'undefined') return;
-      lastPersistedValue = null;
-      window.localStorage.removeItem(name);
-    },
-  };
-}
+const PERSIST_VERSION = 2;
 
 export const useTsukuyomiStore = create<TsukuyomiStore>()(
   persist(
@@ -373,12 +198,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           ocularSpinBurstNonce: isFreshFocusStart
             ? state.ocularSpinBurstNonce + 1
             : state.ocularSpinBurstNonce,
-          tsukuyomiOverdriveActive: isFreshFocusStart
-            ? false
-            : state.tsukuyomiOverdriveActive,
-          activeJutsuUsedInCurrentCycle: isFreshFocusStart
-            ? false
-            : state.activeJutsuUsedInCurrentCycle,
           timer: {
             ...state.timer,
             status: 'running',
@@ -478,19 +297,10 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         }
 
         const today = formatLocalDate();
-        const baseDurationMinutes = Math.max(
+        const durationMinutes = Math.max(
           1,
           Math.round(state.timer.durationSeconds / 60),
         );
-        const activePassive = getActivePassive(state);
-        const timeDilationFactor =
-          activePassive?.type === 'TIME_DILATION'
-            ? Math.max(1.05, activePassive.bonusValue || 1.28)
-            : 1.0;
-        const durationMinutes = Math.round(
-          baseDurationMinutes * timeDilationFactor,
-        );
-
         const activeMission = state.missions.find(
           (m) => m.id === state.timer.activeMissionId,
         );
@@ -498,26 +308,12 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         const isAmaterasu = activeMission?.isAmaterasu ?? false;
         const usedSusanoo = state.timer.susanooEnabled;
 
-        let chakraEarned = calculateSessionChakra({
+        const chakraEarned = calculateSessionChakra({
           durationMinutes,
           rank,
           isAmaterasu,
           usedSusanoo,
         });
-
-        if (activePassive?.type === 'CHAKRA_MULTIPLIER') {
-          const multiplier = Math.max(1.05, activePassive.bonusValue || 1.25);
-          chakraEarned = Math.round(chakraEarned * multiplier);
-        }
-
-        if (activePassive?.type === 'AMATERASU_MASTERY' && isAmaterasu) {
-          // Amaterasu Mastery doubles the Black-Flame bonus intensity
-          chakraEarned = Math.round(chakraEarned * 1.45);
-        }
-
-        if (state.tsukuyomiOverdriveActive) {
-          chakraEarned *= 2;
-        }
 
         const nextChakra = state.chakra + chakraEarned;
         const streakUpdate = computeStreakOnCompletion({
@@ -527,30 +323,15 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           today,
         });
 
-        const nextVisualBlurLevel = (
-          activePassive?.type === 'VISUAL_IMMUNITY'
-            ? 0
-            : Math.max(0, state.visualBlurLevel - 1)
+        const nextVisualBlurLevel = Math.max(
+          0,
+          state.visualBlurLevel - 1,
         ) as VisualBlurLevel;
-
-        const restorationTargetMinutes =
-          activePassive?.type === 'IZANAGI_REGEN'
-            ? Math.max(45, Math.round(activePassive.bonusValue || 90))
-            : 180;
 
         const nextIzanagi = applyIzanagiRestoration(
           state.izanagi,
           durationMinutes,
-          restorationTargetMinutes,
         );
-
-        const nextCooldownCyclesRemaining = state.activeJutsuUsedInCurrentCycle
-          ? Math.max(
-              0,
-              (state.activeOcularPowers?.rightEyeActiveJutsu.cooldownCycles ??
-                1) - 1,
-            )
-          : Math.max(0, state.activeJutsuCooldownCyclesRemaining - 1);
 
         const newLog: FocusSessionLog = {
           id: generateId('log'),
@@ -592,9 +373,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           izanagi: nextIzanagi,
           missions: nextMissions,
           sessionLogs: [newLog, ...state.sessionLogs],
-          tsukuyomiOverdriveActive: false,
-          activeJutsuUsedInCurrentCycle: false,
-          activeJutsuCooldownCyclesRemaining: nextCooldownCyclesRemaining,
           currentEyeStage: didUnlockNewEye
             ? highestUnlocked
             : state.currentEyeStage,
@@ -612,34 +390,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             targetEndTime: null,
             susanooEnabled: false,
           },
-        });
-
-        runBackendSync(async () => {
-          const response = await completeBackendSession({
-            missionId: isValidGuid(activeMission?.id) ? activeMission.id : null,
-            durationMinutes,
-            wasSusanooActive: usedSusanoo,
-            markMissionCompleted: false,
-          });
-          const syncedLog = mapApiLog(response.session);
-          const syncedMission = response.updatedMission
-            ? mapApiMission(response.updatedMission)
-            : null;
-
-          set((curr) => ({
-            backendConnected: true,
-            ...mapApiProfilePatch(response.profile, curr.customEye, response.izanagi),
-            missions: syncedMission
-              ? curr.missions.map((m) => (m.id === syncedMission.id ? syncedMission : m))
-              : curr.missions,
-            sessionLogs: [
-              syncedLog,
-              ...curr.sessionLogs.filter((l) => l.id !== newLog.id && l.id !== syncedLog.id),
-            ],
-            pendingAwakening: response.unlockedNewEyeStage && response.newEyeStage
-              ? response.newEyeStage
-              : curr.pendingAwakening,
-          }));
         });
       },
 
@@ -660,16 +410,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           return;
         }
 
-        const activeMissionForIzanagi = state.missions.find(
-          (m) => m.id === state.timer.activeMissionId,
-        );
-        const elapsedForIzanagi = Math.max(
-          0,
-          Math.floor(
-            (state.timer.durationSeconds - state.timer.remainingSeconds) / 60,
-          ),
-        );
-
         if (options?.useIzanagi && canInvokeIzanagi(state.izanagi)) {
           const nextIzanagi = blindNextHealthyEye(state.izanagi);
           if (nextIzanagi) {
@@ -684,21 +424,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
                 targetEndTime: null,
                 susanooEnabled: false,
               },
-            });
-
-            runBackendSync(async () => {
-              const response = await abandonBackendSession({
-                missionId: isValidGuid(activeMissionForIzanagi?.id)
-                  ? activeMissionForIzanagi.id
-                  : null,
-                durationMinutesElapsed: elapsedForIzanagi,
-                wasSusanooActive: state.timer.susanooEnabled,
-                useIzanagiToPreventPenalty: true,
-              });
-              set((curr) => ({
-                backendConnected: true,
-                ...mapApiProfilePatch(response.profile, curr.customEye, response.izanagi),
-              }));
             });
             return;
           }
@@ -729,20 +454,10 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           date: today,
         };
 
-        const activePassiveOnAbandon = getActivePassive(state);
-        const nextBlur = (
-          activePassiveOnAbandon?.type === 'VISUAL_IMMUNITY'
-            ? 0
-            : activePassiveOnAbandon?.type === 'IZANAGI_REGEN' &&
-                state.timer.susanooEnabled
-              ? state.visualBlurLevel
-              : Math.min(3, state.visualBlurLevel + 1)
-        ) as VisualBlurLevel;
+        const nextBlur = Math.min(3, state.visualBlurLevel + 1) as VisualBlurLevel;
 
         set({
           visualBlurLevel: nextBlur,
-          tsukuyomiOverdriveActive: false,
-          activeJutsuUsedInCurrentCycle: false,
           sessionLogs: [abandonedLog, ...state.sessionLogs],
           timer: {
             ...state.timer,
@@ -752,43 +467,18 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             susanooEnabled: false,
           },
         });
-
-        runBackendSync(async () => {
-          const response = await abandonBackendSession({
-            missionId: isValidGuid(activeMission?.id) ? activeMission.id : null,
-            durationMinutesElapsed: elapsedMinutes,
-            wasSusanooActive: state.timer.susanooEnabled,
-            useIzanagiToPreventPenalty: false,
-          });
-          const syncedLog = mapApiLog(response.session);
-          set((curr) => ({
-            backendConnected: true,
-            ...mapApiProfilePatch(response.profile, curr.customEye, response.izanagi),
-            sessionLogs: [
-              syncedLog,
-              ...curr.sessionLogs.filter((l) => l.id !== abandonedLog.id && l.id !== syncedLog.id),
-            ],
-          }));
-        });
       },
 
       addMission: (input: CreateMissionInput): Mission => {
         const today = formatLocalDate();
         const state = get();
-        const activePassive = getActivePassive(state);
-        const maxAmaterasuPerDay =
-          activePassive?.type === 'AMATERASU_MASTERY'
-            ? Math.max(2, Math.round(activePassive.bonusValue || 2))
-            : 1;
-        const activeAmaterasuTodayCount = state.missions.filter(
+        const hasActiveAmaterasuToday = state.missions.some(
           (m) =>
             m.status !== 'completed' &&
             m.isAmaterasu &&
             m.amaterasuDate === today,
-        ).length;
-        const allowAmaterasu =
-          Boolean(input.isAmaterasu) &&
-          activeAmaterasuTodayCount < maxAmaterasuPerDay;
+        );
+        const allowAmaterasu = Boolean(input.isAmaterasu) && !hasActiveAmaterasuToday;
 
         const mission: Mission = {
           id: generateId('mission'),
@@ -810,32 +500,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           missions: [mission, ...curr.missions],
         }));
 
-        runBackendSync(async () => {
-          const created = await createBackendMission({
-            title: mission.title,
-            description: mission.description,
-            rank: mission.rank,
-            estimatedMinutes: mission.estimatedMinutes,
-            isAmaterasu: mission.isAmaterasu,
-          });
-          const finalDto =
-            mission.status !== 'todo'
-              ? await patchBackendMissionStatus(created.id, mission.status)
-              : created;
-          const syncedMission = mapApiMission(finalDto);
-
-          set((curr) => ({
-            backendConnected: true,
-            missions: curr.missions.map((m) =>
-              m.id === mission.id ? syncedMission : m,
-            ),
-            timer:
-              curr.timer.activeMissionId === mission.id
-                ? { ...curr.timer, activeMissionId: syncedMission.id }
-                : curr.timer,
-          }));
-        });
-
         return mission;
       },
 
@@ -848,25 +512,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             m.id === id ? { ...m, ...patch } : m,
           ),
         }));
-
-        if (isValidGuid(id)) {
-          const updated = get().missions.find((m) => m.id === id);
-          if (updated) {
-            runBackendSync(async () => {
-              const dto = await updateBackendMission(id, {
-                title: updated.title,
-                description: updated.description,
-                rank: updated.rank,
-                estimatedMinutes: updated.estimatedMinutes,
-              });
-              const synced = mapApiMission(dto);
-              set((curr) => ({
-                backendConnected: true,
-                missions: curr.missions.map((m) => (m.id === id ? synced : m)),
-              }));
-            });
-          }
-        }
       },
 
       deleteMission: (id: string) => {
@@ -877,13 +522,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
               ? { ...state.timer, activeMissionId: null }
               : state.timer,
         }));
-
-        if (isValidGuid(id)) {
-          runBackendSync(async () => {
-            await deleteBackendMission(id);
-            set({ backendConnected: true });
-          });
-        }
       },
 
       moveMission: (
@@ -919,13 +557,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
 
           return { missions: [updatedMission, ...remaining] };
         });
-
-        if (isValidGuid(id)) {
-          runBackendSync(async () => {
-            await patchBackendMissionStatus(id, targetStatus);
-            set({ backendConnected: true });
-          });
-        }
       },
 
       reorderMissionsInColumn: (
@@ -970,36 +601,23 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
               m.id === id ? { ...m, isAmaterasu: false, amaterasuDate: null } : m,
             ),
           });
-          if (isValidGuid(id)) {
-            runBackendSync(async () => {
-              await toggleBackendMissionAmaterasu(id, false);
-              set({ backendConnected: true });
-            });
-          }
           return { ok: true };
         }
 
         const today = formatLocalDate();
-        const activePassive = getActivePassive(state);
-        const maxAmaterasuPerDay =
-          activePassive?.type === 'AMATERASU_MASTERY'
-            ? Math.max(2, Math.round(activePassive.bonusValue || 2))
-            : 1;
-        const existingTodayCount = state.missions.filter(
+        const existingToday = state.missions.find(
           (m) =>
             m.id !== id &&
             m.status !== 'completed' &&
             m.isAmaterasu &&
             m.amaterasuDate === today,
-        ).length;
+        );
 
-        if (existingTodayCount >= maxAmaterasuPerDay) {
+        if (existingToday) {
           return {
             ok: false,
             reason:
-              maxAmaterasuPerDay > 1
-                ? `Limite diário (${maxAmaterasuPerDay} missões com Amaterasu) atingido hoje.`
-                : 'Já existe uma missão marcada com o Amaterasu hoje. Conclua-a ou apague suas chamas primeiro.',
+              'Já existe uma missão marcada com o Amaterasu hoje. Conclua-a ou apague suas chamas primeiro.',
           };
         }
 
@@ -1009,12 +627,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             m.id === id ? { ...m, isAmaterasu: true, amaterasuDate: today } : m,
           ),
         });
-        if (isValidGuid(id)) {
-          runBackendSync(async () => {
-            await toggleBackendMissionAmaterasu(id, true);
-            set({ backendConnected: true });
-          });
-        }
         return { ok: true };
       },
 
@@ -1057,13 +669,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
                 },
           };
         });
-
-        if (isValidGuid(id)) {
-          runBackendSync(async () => {
-            await patchBackendMissionStatus(id, 'in_tsukuyomi');
-            set({ backendConnected: true });
-          });
-        }
       },
 
       setActiveMission: (id: string | null) => {
@@ -1214,27 +819,10 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         ) {
           return;
         }
-        audioEngine.setCustomPitchRate(1.0);
         void audioEngine.play('mangekyou-awaken');
         set({
           equippedEyeStage: stage,
-          customEye: {
-            ...state.customEye,
-            enabled: false,
-            imageDataUrl: null,
-          },
-          equippedForgedEyeId: null,
-          activeOcularPowers: null,
           ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
-        });
-
-        runBackendSync(async () => {
-          await patchEyeCustomization({
-            equippedEyeStage: stage,
-            customEyeImageUrl: null,
-            clearCustomEyeImage: true,
-          });
-          set({ backendConnected: true });
         });
       },
 
@@ -1251,31 +839,10 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         ) {
           return;
         }
-        const nextStage: EyeStage =
-          state.equippedEyeStage === 'ems' ? 'ems' : 'mangekyou';
-        audioEngine.setCustomPitchRate(1.0);
         void audioEngine.play('mangekyou-awaken');
         set({
-          equippedEyeStage: nextStage,
           mangekyouVariant: variant,
-          customEye: {
-            ...state.customEye,
-            enabled: false,
-            imageDataUrl: null,
-          },
-          equippedForgedEyeId: null,
-          activeOcularPowers: null,
           ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
-        });
-
-        runBackendSync(async () => {
-          await patchEyeCustomization({
-            equippedEyeStage: nextStage,
-            mangekyouVariant: variant,
-            customEyeImageUrl: null,
-            clearCustomEyeImage: true,
-          });
-          set({ backendConnected: true });
         });
       },
 
@@ -1303,491 +870,12 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
       },
 
       updateCustomEye: (patch: Partial<CustomEyeConfig>) => {
-        set((state) => {
-          const nextCustomEye = {
-            ...state.customEye,
-            ...patch,
-          };
-          if (nextCustomEye.enabled && state.activeOcularPowers) {
-            audioEngine.setCustomPitchRate(
-              state.activeOcularPowers.visualThemeSignature.audioPitchRate,
-            );
-          } else {
-            audioEngine.setCustomPitchRate(1.0);
-          }
-
-          const shouldUpdateForgedComposite =
-            Boolean(state.equippedForgedEyeId) &&
-            typeof patch.imageDataUrl === 'string' &&
-            !patch.imageDataUrl.startsWith('data:image/svg+xml');
-          const visualChanged =
-            patch.imageDataUrl !== undefined || patch.enabled !== undefined;
-
-          return {
-            customEye: nextCustomEye,
-            ocularSpinBurstNonce: visualChanged
-              ? state.ocularSpinBurstNonce + 1
-              : state.ocularSpinBurstNonce,
-            forgedEyesInventory: shouldUpdateForgedComposite
-              ? state.forgedEyesInventory.map((item) =>
-                  item.id === state.equippedForgedEyeId
-                    ? { ...item, compositeDataUrl: patch.imageDataUrl ?? null }
-                    : item,
-                )
-              : state.forgedEyesInventory,
-          };
-        });
-
-        if (patch.imageDataUrl !== undefined || patch.enabled !== undefined) {
-          const nextCustomEye = get().customEye;
-          const shouldClear =
-            patch.imageDataUrl === null || patch.enabled === false;
-          runBackendSync(async () => {
-            await patchEyeCustomization({
-              customEyeImageUrl: shouldClear ? null : nextCustomEye.imageDataUrl,
-              clearCustomEyeImage: shouldClear,
-            });
-            set({ backendConnected: true });
-          });
-        }
-      },
-
-      syncFromBackend: async () => {
-        try {
-          const remote = await fetchFullState();
-          const remoteMissions = remote.missions.map(mapApiMission);
-          const remoteLogs = remote.recentLogs.map(mapApiLog);
-
-          set((state) => {
-            const currentActiveExists =
-              state.timer.activeMissionId !== null &&
-              remoteMissions.some((m) => m.id === state.timer.activeMissionId);
-
-            const nextActiveMission = currentActiveExists
-              ? (remoteMissions.find((m) => m.id === state.timer.activeMissionId) ?? null)
-              : (remoteMissions.find((m) => m.status === 'in_tsukuyomi') ?? null);
-
-            const shouldResetIdleDuration =
-              state.timer.status === 'idle' &&
-              state.timer.mode === 'focus' &&
-              !currentActiveExists &&
-              nextActiveMission !== null;
-
-            const nextDurationSeconds =
-              shouldResetIdleDuration && nextActiveMission
-                ? Math.max(1, nextActiveMission.estimatedMinutes) * 60
-                : state.timer.durationSeconds;
-
-            const nextPenalty =
-              remote.amaterasuPenaltyApplied && remote.amaterasuPenaltyChakra > 0
-                ? {
-                    missionId: 'amaterasu-daily-check',
-                    missionTitle:
-                      remote.expiredAmaterasuMissions[0] ??
-                      'Missão Amaterasu expirada',
-                    chakraLost: remote.amaterasuPenaltyChakra,
-                    failedDate: formatLocalDate(),
-                  }
-                : state.pendingAmaterasuPenalty;
-
-            return {
-              backendConnected: true,
-              ...mapApiProfilePatch(remote.profile, state.customEye, remote.izanagi),
-              missions: remoteMissions,
-              sessionLogs: remoteLogs,
-              pendingAmaterasuPenalty: nextPenalty,
-              timer: {
-                ...state.timer,
-                activeMissionId: nextActiveMission?.id ?? null,
-                durationSeconds: nextDurationSeconds,
-                remainingSeconds: shouldResetIdleDuration
-                  ? nextDurationSeconds
-                  : state.timer.remainingSeconds,
-              },
-            };
-          });
-        } catch {
-          set({ backendConnected: false });
-        }
-      },
-
-      generateCustomSharinganWithAi: async (
-        input: GenerateSharinganInput,
-      ): Promise<GeneratedSharinganLore> => {
-        set({ isGeneratingSharingan: true });
-        try {
-          const state = get();
-          const styleVariant = input.styleVariant ?? state.mangekyouVariant;
-          const outputFormat = input.outputFormat ?? 'anime_svg';
-          const autoEquip = input.autoEquip ?? true;
-
-          const response = await generateAiSharingan({
-            prompt: input.prompt?.trim() || undefined,
-            baseEyeImageBase64: input.baseEyeImageBase64 ?? null,
-            styleVariant,
-            outputFormat,
-            autoEquip,
-          });
-
-          const ocularPowers = normalizeOcularPowersFromResponse(response);
-
-          const lore: GeneratedSharinganLore = {
-            doujutsuName: response.doujutsuName,
-            loreDescription: response.loreDescription,
-            detectedMood: response.detectedMood ?? '',
-            eyeCenterX: response.eyeCenterX ?? 0.5,
-            eyeCenterY: response.eyeCenterY ?? 0.5,
-            irisRadiusRatio: response.irisRadiusRatio ?? 0.22,
-            bladeCount: response.bladeCount ?? 3,
-            patternType: response.patternType ?? 'itachi_shuriken',
-            centerShape: response.centerShape ?? 'circle',
-            bladeStyle: response.bladeStyle ?? 'curved_shuriken',
-            outerRingStyle: response.outerRingStyle ?? 'tomoe_ring',
-            primaryCrimsonHex:
-              response.primaryCrimsonHex ??
-              ocularPowers.visualThemeSignature.primaryGlowColor,
-            secondaryDarkHex:
-              response.secondaryDarkHex ??
-              ocularPowers.visualThemeSignature.secondaryColor,
-            hasAmaterasuFlames: Boolean(response.hasAmaterasuFlames),
-            rotationOffset: response.rotationOffset ?? 0,
-            rawSvgCode: response.rawSvgCode,
-            svgDataUri: response.svgDataUri,
-            rasterImageUrl: response.rasterImageUrl,
-            primaryGlowColor: ocularPowers.visualThemeSignature.primaryGlowColor,
-            equippedImageUrl: response.equippedImageUrl,
-            outputFormat,
-            ocularPowers,
-          };
-
-          const forgedItem: ForgedEyeItem = {
-            id: generateId('eye'),
-            doujutsuName: lore.doujutsuName,
-            loreDescription: lore.loreDescription,
-            detectedMood: lore.detectedMood,
-            svgDataUri: lore.svgDataUri,
-            compositeDataUrl:
-              outputFormat === 'photo_lens' ? lore.equippedImageUrl : null,
-            primaryCrimsonHex: lore.primaryCrimsonHex,
-            secondaryDarkHex: lore.secondaryDarkHex,
-            patternType: lore.patternType,
-            centerShape: lore.centerShape,
-            bladeStyle: lore.bladeStyle,
-            bladeCount: lore.bladeCount,
-            outerRingStyle: lore.outerRingStyle,
-            hasAmaterasuFlames: lore.hasAmaterasuFlames,
-            ocularPowers,
-            createdAt: new Date().toISOString(),
-          };
-
-          const shouldActivatePowers = autoEquip || outputFormat === 'photo_lens';
-          audioEngine.setCustomPitchRate(
-            shouldActivatePowers
-              ? ocularPowers.visualThemeSignature.audioPitchRate
-              : 1.0,
-          );
-          void audioEngine.play('mangekyou-awaken');
-
-          set((curr) => {
-            const nextCustomEye: CustomEyeConfig = autoEquip
-              ? {
-                  ...curr.customEye,
-                  enabled: true,
-                  imageDataUrl: response.equippedImageUrl,
-                }
-              : curr.customEye;
-
-            const profilePatch = response.profile
-              ? mapApiProfilePatch(response.profile, nextCustomEye)
-              : {};
-
-            return {
-              ...profilePatch,
-              backendConnected: true,
-              lastGeneratedSharingan: lore,
-              customEye: nextCustomEye,
-              forgedEyesInventory: [forgedItem, ...curr.forgedEyesInventory].slice(
-                0,
-                24,
-              ),
-              equippedForgedEyeId: shouldActivatePowers
-                ? forgedItem.id
-                : curr.equippedForgedEyeId,
-              activeOcularPowers: shouldActivatePowers
-                ? ocularPowers
-                : curr.activeOcularPowers,
-              activeJutsuCooldownCyclesRemaining: shouldActivatePowers
-                ? 0
-                : curr.activeJutsuCooldownCyclesRemaining,
-              ocularSpinBurstNonce: curr.ocularSpinBurstNonce + 1,
-            };
-          });
-
-          return lore;
-        } finally {
-          set({ isGeneratingSharingan: false });
-        }
-      },
-
-      addForgedEyeToInventory: (item: ForgedEyeItem, autoEquip = false) => {
-        set((state) => {
-          const deduped = state.forgedEyesInventory.filter(
-            (existing) => existing.id !== item.id,
-          );
-          const nextInventory = [item, ...deduped].slice(0, 24);
-          if (autoEquip) {
-            audioEngine.setCustomPitchRate(
-              item.ocularPowers.visualThemeSignature.audioPitchRate,
-            );
-          }
-          return {
-            forgedEyesInventory: nextInventory,
-            equippedForgedEyeId: autoEquip
-              ? item.id
-              : state.equippedForgedEyeId,
-            activeOcularPowers: autoEquip
-              ? item.ocularPowers
-              : state.activeOcularPowers,
-            customEye: autoEquip
-              ? {
-                  ...state.customEye,
-                  enabled: true,
-                  imageDataUrl: item.compositeDataUrl ?? item.svgDataUri,
-                }
-              : state.customEye,
-          };
-        });
-      },
-
-      equipForgedEye: (id: string) => {
-        const state = get();
-        const found = state.forgedEyesInventory.find((item) => item.id === id);
-        if (!found) return;
-
-        audioEngine.setCustomPitchRate(
-          found.ocularPowers.visualThemeSignature.audioPitchRate,
-        );
-        void audioEngine.play('mangekyou-awaken');
-
-        const nextImage = found.compositeDataUrl ?? found.svgDataUri;
-        set({
-          equippedForgedEyeId: found.id,
-          activeOcularPowers: found.ocularPowers,
-          tsukuyomiOverdriveActive: false,
-          activeJutsuCooldownCyclesRemaining: 0,
+        set((state) => ({
           customEye: {
             ...state.customEye,
-            enabled: true,
-            imageDataUrl: nextImage,
+            ...patch,
           },
-          ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
-        });
-
-        runBackendSync(async () => {
-          await patchEyeCustomization({
-            customEyeImageUrl: nextImage,
-            clearCustomEyeImage: false,
-          });
-          set({ backendConnected: true });
-        });
-      },
-
-      deleteForgedEye: (id: string) => {
-        const state = get();
-        const isDeletingEquipped = state.equippedForgedEyeId === id;
-        const remaining = state.forgedEyesInventory.filter(
-          (item) => item.id !== id,
-        );
-
-        audioEngine.playClick();
-        if (isDeletingEquipped) {
-          audioEngine.setCustomPitchRate(1.0);
-        }
-
-        set({
-          forgedEyesInventory: remaining,
-          equippedForgedEyeId: isDeletingEquipped
-            ? null
-            : state.equippedForgedEyeId,
-          activeOcularPowers: isDeletingEquipped
-            ? null
-            : state.activeOcularPowers,
-          customEye: isDeletingEquipped
-            ? { ...state.customEye, enabled: false, imageDataUrl: null }
-            : state.customEye,
-          ocularSpinBurstNonce: isDeletingEquipped
-            ? state.ocularSpinBurstNonce + 1
-            : state.ocularSpinBurstNonce,
-        });
-
-        if (isDeletingEquipped) {
-          runBackendSync(async () => {
-            await patchEyeCustomization({
-              customEyeImageUrl: null,
-              clearCustomEyeImage: true,
-            });
-            set({ backendConnected: true });
-          });
-        }
-      },
-
-      invokeRightEyeJutsu: () => {
-        const state = get();
-        if (!state.customEye.enabled || !state.activeOcularPowers) {
-          return {
-            ok: false,
-            message: 'Equipe um Mangekyou Forjado para invocar o Jutsu do Olho Direito.',
-          };
-        }
-
-        if (state.activeJutsuUsedInCurrentCycle) {
-          return {
-            ok: false,
-            message: 'O Olho Direito já foi invocado neste ciclo de foco.',
-          };
-        }
-
-        if (state.activeJutsuCooldownCyclesRemaining > 0) {
-          return {
-            ok: false,
-            message: `Jutsu em recarga (${state.activeJutsuCooldownCyclesRemaining} ciclo restante).`,
-          };
-        }
-
-        const jutsu = state.activeOcularPowers.rightEyeActiveJutsu;
-
-        if (jutsu.type === 'KAMUI_SKIP') {
-          if (state.timer.mode !== 'focus' || state.timer.status === 'idle') {
-            return {
-              ok: false,
-              message: 'Inicie um ciclo de Foco para teleportar o tempo com o Kamui.',
-            };
-          }
-
-          void audioEngine.play('tsukuyomi-cast');
-          const remaining = state.timer.remainingSeconds;
-          if (remaining <= 300) {
-            set({
-              activeJutsuUsedInCurrentCycle: true,
-              activeJutsuCooldownCyclesRemaining: Math.max(
-                0,
-                jutsu.cooldownCycles - 1,
-              ),
-              ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
-            });
-            get().completeActiveCycle();
-            return {
-              ok: true,
-              message: `${jutsu.name}: Vórtice Kamui concluiu os minutos finais com 100% de Chakra!`,
-            };
-          }
-
-          const nextRemaining = Math.max(1, remaining - 300);
-          const nextTargetEnd =
-            state.timer.status === 'running' && state.timer.targetEndTime !== null
-              ? state.timer.targetEndTime - 300 * 1000
-              : null;
-
-          set({
-            activeJutsuUsedInCurrentCycle: true,
-            ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
-            tsukuyomiCastNonce: state.tsukuyomiCastNonce + 1,
-            timer: {
-              ...state.timer,
-              remainingSeconds: nextRemaining,
-              targetEndTime: nextTargetEnd,
-            },
-          });
-
-          return {
-            ok: true,
-            message: `${jutsu.name}: -5 minutos distorcidos no espaço-tempo!`,
-          };
-        }
-
-        if (jutsu.type === 'TSUKUYOMI_OVERDRIVE') {
-          if (state.timer.mode !== 'focus' || state.timer.status === 'idle') {
-            return {
-              ok: false,
-              message: 'Inicie o cronômetro em Foco para ativar a Sobrecarga 2x Chakra.',
-            };
-          }
-
-          void audioEngine.play('susanoo-summon');
-          set({
-            tsukuyomiOverdriveActive: true,
-            activeJutsuUsedInCurrentCycle: true,
-            ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
-            tsukuyomiCastNonce: state.tsukuyomiCastNonce + 1,
-          });
-          return {
-            ok: true,
-            message: `${jutsu.name}: Overdrive 2x Chakra ativado até o fim deste ciclo!`,
-          };
-        }
-
-        if (jutsu.type === 'KOTOAMATSUKAMI_COMPLETE') {
-          void audioEngine.play('mangekyou-awaken');
-          const activeMission = state.missions.find(
-            (m) => m.id === state.timer.activeMissionId,
-          );
-          const nextBlur = Math.max(
-            0,
-            state.visualBlurLevel - 1,
-          ) as VisualBlurLevel;
-
-          const nextMissions = activeMission
-            ? state.missions.map((m) => {
-                if (m.id !== activeMission.id) return m;
-                const nextCompleted = m.completedMinutes + 25;
-                const finished = nextCompleted >= m.estimatedMinutes;
-                return {
-                  ...m,
-                  completedMinutes: nextCompleted,
-                  status: finished ? ('completed' as const) : m.status,
-                  completedAt: finished
-                    ? m.completedAt ?? new Date().toISOString()
-                    : m.completedAt,
-                };
-              })
-            : state.missions;
-
-          set({
-            missions: nextMissions,
-            chakra: state.chakra + 250,
-            visualBlurLevel: nextBlur,
-            activeJutsuUsedInCurrentCycle: true,
-            activeJutsuCooldownCyclesRemaining: Math.max(
-              0,
-              jutsu.cooldownCycles - 1,
-            ),
-            ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
-          });
-
-          return {
-            ok: true,
-            message: activeMission
-              ? `${jutsu.name}: +25m impressos em "${activeMission.title}", +250 Chakra e acuidade restaurada!`
-              : `${jutsu.name}: +250 Chakra absorvidos e +1 nível de Acuidade Visual restaurado!`,
-          };
-        }
-
-        // SHINRA_TENSEI_PURGE
-        void audioEngine.play('rinnegan-awaken');
-        set({
-          visualBlurLevel: 0,
-          chakra: state.chakra + 200,
-          activeJutsuUsedInCurrentCycle: true,
-          activeJutsuCooldownCyclesRemaining: Math.max(
-            0,
-            jutsu.cooldownCycles - 1,
-          ),
-          ocularSpinBurstNonce: state.ocularSpinBurstNonce + 1,
-        });
-        return {
-          ok: true,
-          message: `${jutsu.name}: Desgaste Visual purgado (100% Acuidade) e +200 Chakra canalizados!`,
-        };
+        }));
       },
 
       updateAudioSettings: (patch: Partial<AudioSettings>) => {
@@ -1826,14 +914,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
               : state.pendingAwakening,
           };
         });
-
-        runBackendSync(async () => {
-          const remote = await postDevSimulate({ addChakra: amount });
-          set((curr) => ({
-            backendConnected: true,
-            ...mapApiProfilePatch(remote.profile, curr.customEye, remote.izanagi),
-          }));
-        });
       },
 
       devUnlockAllEyes: () => {
@@ -1845,14 +925,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             equippedEyeStage: 'rinnegan',
             pendingAwakening: 'rinnegan',
           };
-        });
-
-        runBackendSync(async () => {
-          const remote = await postDevSimulate({ unlockAllEyes: true });
-          set((curr) => ({
-            backendConnected: true,
-            ...mapApiProfilePatch(remote.profile, curr.customEye, remote.izanagi),
-          }));
         });
       },
 
@@ -1885,19 +957,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
           },
           izanagiFlashNonce: state.izanagiFlashNonce + 1,
         }));
-
-        const nextIzanagi = get().izanagi;
-        runBackendSync(async () => {
-          const remote = await postDevSimulate(
-            eye === 'left'
-              ? { simulateLeftEyeBlind: nextIzanagi.leftEyeBlind }
-              : { simulateRightEyeBlind: nextIzanagi.rightEyeBlind },
-          );
-          set((curr) => ({
-            backendConnected: true,
-            ...mapApiProfilePatch(remote.profile, curr.customEye, remote.izanagi),
-          }));
-        });
       },
 
       devSimulateDayTurnWithAmaterasu: () => {
@@ -1944,7 +1003,7 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
     {
       name: PERSIST_STORAGE_KEY,
       version: PERSIST_VERSION,
-      storage: createJSONStorage(() => createDeduplicatedStorage()),
+      storage: createJSONStorage(() => localStorage),
       partialize: (
         state,
       ): Omit<
@@ -1953,10 +1012,6 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         | 'izanagiFlashNonce'
         | 'tsukuyomiCastNonce'
         | 'ocularSpinBurstNonce'
-        | 'backendConnected'
-        | 'isGeneratingSharingan'
-        | 'tsukuyomiOverdriveActive'
-        | 'activeJutsuUsedInCurrentCycle'
       > => ({
         activeTab: state.activeTab,
         chakra: state.chakra,
@@ -1976,22 +1031,10 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
         sessionLogs: state.sessionLogs,
         customEye: state.customEye,
         audio: state.audio,
-        timer: {
-          ...state.timer,
-          remainingSeconds:
-            state.timer.status === 'running'
-              ? state.timer.durationSeconds
-              : state.timer.remainingSeconds,
-        },
+        timer: state.timer,
         pendingAwakening: state.pendingAwakening,
         pendingAmaterasuPenalty: state.pendingAmaterasuPenalty,
         pendingIzanagiRescue: state.pendingIzanagiRescue,
-        lastGeneratedSharingan: state.lastGeneratedSharingan,
-        forgedEyesInventory: state.forgedEyesInventory,
-        equippedForgedEyeId: state.equippedForgedEyeId,
-        activeOcularPowers: state.activeOcularPowers,
-        activeJutsuCooldownCyclesRemaining:
-          state.activeJutsuCooldownCyclesRemaining,
       }),
       migrate: (persistedState: unknown, version: number) => {
         const base = createInitialSeedState();
@@ -2006,42 +1049,18 @@ export const useTsukuyomiStore = create<TsukuyomiStore>()(
             isBetaFullAccess: true,
             susanooStageOverride: 'auto' as const,
             currentEyeStage: 'rinnegan' as const,
-            lastGeneratedSharingan: incoming.lastGeneratedSharingan ?? null,
-            forgedEyesInventory: incoming.forgedEyesInventory ?? [],
-            equippedForgedEyeId: incoming.equippedForgedEyeId ?? null,
-            activeOcularPowers: incoming.activeOcularPowers ?? null,
-            activeJutsuCooldownCyclesRemaining:
-              incoming.activeJutsuCooldownCyclesRemaining ?? 0,
             izanagi: { ...base.izanagi, ...(incoming.izanagi ?? {}) },
             customEye: { ...base.customEye, ...(incoming.customEye ?? {}) },
             audio: { ...base.audio, ...(incoming.audio ?? {}) },
             timer: { ...base.timer, ...(incoming.timer ?? {}) },
           };
         }
-        return {
-          ...base,
-          ...incoming,
-          lastGeneratedSharingan: incoming.lastGeneratedSharingan ?? null,
-          forgedEyesInventory: incoming.forgedEyesInventory ?? [],
-          equippedForgedEyeId: incoming.equippedForgedEyeId ?? null,
-          activeOcularPowers: incoming.activeOcularPowers ?? null,
-          activeJutsuCooldownCyclesRemaining:
-            incoming.activeJutsuCooldownCyclesRemaining ?? 0,
-        };
+        return base;
       },
       onRehydrateStorage: () => (rehydratedState) => {
         if (!rehydratedState) return;
         rehydratedState.setHasHydrated(true);
         audioEngine.syncSettings(rehydratedState.audio);
-        if (
-          rehydratedState.customEye.enabled &&
-          rehydratedState.activeOcularPowers
-        ) {
-          audioEngine.setCustomPitchRate(
-            rehydratedState.activeOcularPowers.visualThemeSignature
-              .audioPitchRate,
-          );
-        }
 
         if (
           rehydratedState.timer.status === 'running' &&
@@ -2114,22 +1133,3 @@ export const useOcularProfile = () =>
 
 export const useAudioSettings = () =>
   useTsukuyomiStore((state) => state.audio);
-
-export const useForgedEyesInventory = () =>
-  useTsukuyomiStore((state) => state.forgedEyesInventory);
-
-export const useEquippedForgedEyeId = () =>
-  useTsukuyomiStore((state) => state.equippedForgedEyeId);
-
-export const useActiveOcularPowers = () =>
-  useTsukuyomiStore((state) => state.activeOcularPowers);
-
-export const useOcularJutsuState = () =>
-  useTsukuyomiStore(
-    useShallow((state) => ({
-      tsukuyomiOverdriveActive: state.tsukuyomiOverdriveActive,
-      activeJutsuCooldownCyclesRemaining:
-        state.activeJutsuCooldownCyclesRemaining,
-      activeJutsuUsedInCurrentCycle: state.activeJutsuUsedInCurrentCycle,
-    })),
-  );
