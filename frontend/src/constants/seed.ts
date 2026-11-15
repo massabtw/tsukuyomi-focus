@@ -229,5 +229,11 @@ export function createInitialSeedState(
     backendConnected: false,
     isGeneratingSharingan: false,
     lastGeneratedSharingan: null,
+    forgedEyesInventory: [],
+    equippedForgedEyeId: null,
+    activeOcularPowers: null,
+    tsukuyomiOverdriveActive: false,
+    activeJutsuCooldownCyclesRemaining: 0,
+    activeJutsuUsedInCurrentCycle: false,
   };
 }

@@ -24,7 +24,9 @@ import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import { formatTimerClock } from '@/lib/date';
 import {
+  useActiveOcularPowers,
   useIsTsukuyomiMode,
+  useOcularJutsuState,
   useOcularProfile,
   useOcularSpinBurstNonce,
   useTimerCore,
@@ -65,6 +67,8 @@ export function OcularClock() {
     susanooStageOverride,
   } = useOcularProfile();
   const isTsukuyomiMode = useIsTsukuyomiMode();
+  const activeOcularPowers = useActiveOcularPowers();
+  const { tsukuyomiOverdriveActive } = useOcularJutsuState();
   const tsukuyomiCastNonce = useTsukuyomiCastNonce();
   const ocularSpinBurstNonce = useOcularSpinBurstNonce();
 
@@ -77,7 +81,7 @@ export function OcularClock() {
   const [awakeningScope, animateAwakening] = useAnimate();
   const [spinBurstScope, animateSpinBurst] = useAnimate();
   const [shockwaveScope, animateShockwave] = useAnimate();
-  const [saccadeScope, animateSaccade] = useAnimate();
+  const saccadeScope = useRef<HTMLDivElement | null>(null);
   const [sheenScope, animateSheen] = useAnimate();
 
   const [saccadeNonce, setSaccadeNonce] = useState(0);
@@ -173,7 +177,7 @@ export function OcularClock() {
     };
   }, [prefersReducedMotion, fireWetSheen]);
 
-  // Biological saccadic eye twitch every 8s-10s while idle
+  // Biological saccadic pupil dilation every 8s-10s while idle (strictly centered)
   useEffect(() => {
     if (status !== 'idle' || prefersReducedMotion) {
       return;
@@ -181,29 +185,12 @@ export function OcularClock() {
 
     let cancelled = false;
     let timerId: number | null = null;
-    let direction = 1;
 
     const scheduleSaccade = () => {
       if (cancelled) return;
       const delayMs = 8000 + Math.random() * 2000;
       timerId = window.setTimeout(() => {
         if (cancelled) return;
-        direction = -direction;
-        const shiftX = direction * 2;
-
-        if (saccadeScope.current) {
-          void animateSaccade(
-            saccadeScope.current,
-            { x: [0, shiftX, shiftX * 0.3, 0] },
-            {
-              type: 'tween',
-              duration: 0.25,
-              times: [0, 0.28, 0.68, 1],
-              ease: [0.22, 1, 0.36, 1],
-            },
-          );
-        }
-
         setSaccadeNonce((prev) => prev + 1);
         scheduleSaccade();
       }, delayMs);
@@ -217,7 +204,7 @@ export function OcularClock() {
         window.clearTimeout(timerId);
       }
     };
-  }, [status, prefersReducedMotion, animateSaccade, saccadeScope]);
+  }, [status, prefersReducedMotion]);
 
   // Heavy Inertia Lock: -15deg recoil -> +720deg snap in 450ms with blur + shockwave
   useEffect(() => {
@@ -362,8 +349,18 @@ export function OcularClock() {
   }
 
   const useCustomImage = Boolean(customEye.enabled && customEye.imageDataUrl);
+  const customThemeGlowHex =
+    useCustomImage &&
+    activeOcularPowers?.visualThemeSignature.primaryGlowColor
+      ? activeOcularPowers.visualThemeSignature.primaryGlowColor
+      : null;
+
   const effectiveGlowOpacity = useCustomImage
-    ? Math.min(1, customEye.glowIntensity + (isUrgent ? 0.25 : 0))
+    ? Math.min(
+        1,
+        customEye.glowIntensity +
+          (tsukuyomiOverdriveActive ? 0.35 : isUrgent ? 0.25 : 0),
+      )
     : isUrgent
       ? 0.92
       : isRunning
@@ -371,7 +368,8 @@ export function OcularClock() {
         : 0.48;
 
   const effectiveCrimsonHex =
-    equippedEyeStage === 'rinnegan' && !useCustomImage ? '#8B5CF6' : '#DC2626';
+    customThemeGlowHex ??
+    (equippedEyeStage === 'rinnegan' && !useCustomImage ? '#8B5CF6' : '#DC2626');
 
   const susanooActive =
     (susanooEnabled && isFocus) || susanooStageOverride !== 'auto';
@@ -476,7 +474,7 @@ export function OcularClock() {
             <circle
               cx="160"
               cy="160"
-              r="123"
+              r="126"
               fill="none"
               stroke="rgba(255,255,255,0.04)"
               strokeWidth="0.75"
@@ -639,19 +637,21 @@ export function OcularClock() {
             }}
           />
 
-          {/* Plano +1: Ocular Core (Sharingan SVG or Custom IA Image + 3D Spherical Cornea) */}
+          {/* Plano +1: Ocular Core (100% Centered Sharingan SVG or Custom IA Image + 3D Spherical Cornea) */}
           <motion.div
-            style={{ x: parallax.layerFg.x, y: parallax.layerFg.y }}
-            className="absolute z-20 flex h-[67%] w-[67%] items-center justify-center will-change-transform transform-gpu"
+            className="absolute inset-[10.5%] z-20 m-auto flex items-center justify-center overflow-hidden rounded-full origin-center will-change-transform transform-gpu"
+            style={{ transformOrigin: 'center center' }}
           >
             {/* 2-state Spring Awakening */}
             <div
               ref={awakeningScope}
-              className="h-full w-full will-change-transform transform-gpu"
+              className="inset-0 flex h-full w-full items-center justify-center overflow-hidden rounded-full origin-center will-change-transform transform-gpu"
+              style={{ transformOrigin: 'center center' }}
             >
               {/* Cyclic Breathing Tween Wrapper ([1, 1.025, 1] strictly tween) */}
               <motion.div
-                className="h-full w-full rounded-full will-change-transform transform-gpu"
+                className="inset-0 flex h-full w-full items-center justify-center overflow-hidden rounded-full origin-center will-change-transform transform-gpu"
+                style={{ transformOrigin: 'center center' }}
                 animate={
                   prefersReducedMotion
                     ? { scale: 1 }
@@ -669,21 +669,27 @@ export function OcularClock() {
                 }
               >
                 {/* Circular Eyeball Aperture */}
-                <div className="relative h-full w-full overflow-hidden rounded-full bg-black">
-                  {/* Biological Saccadic Eye Twitch Wrapper */}
+                <div
+                  className="relative inset-0 flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-black origin-center"
+                  style={{ transformOrigin: 'center center' }}
+                >
+                  {/* Centered Ocular Wrapper */}
                   <div
                     ref={saccadeScope}
-                    className="h-full w-full will-change-transform transform-gpu"
+                    className="inset-0 flex h-full w-full items-center justify-center overflow-hidden rounded-full origin-center will-change-transform transform-gpu"
+                    style={{ transformOrigin: 'center center' }}
                   >
                     {/* Centrifugal Spin Burst Wrapper (-15deg recoil -> +720deg snap) */}
                     <div
                       ref={spinBurstScope}
-                      className="h-full w-full rounded-full will-change-transform transform-gpu"
+                      className="inset-0 flex h-full w-full items-center justify-center overflow-hidden rounded-full origin-center will-change-transform transform-gpu"
+                      style={{ transformOrigin: 'center center' }}
                     >
                       {/* Continuous GPU-Composited Pure CSS Rotation Wrapper */}
                       <div
-                        className="animate-ocular-spin h-full w-full rounded-full will-change-transform transform-gpu"
+                        className="animate-ocular-spin relative inset-0 flex h-full w-full items-center justify-center overflow-hidden rounded-full origin-center will-change-transform transform-gpu"
                         style={{
+                          transformOrigin: '50% 50%',
                           animationDuration: isUrgent
                             ? '2s'
                             : isRunning && isFocus
@@ -695,34 +701,55 @@ export function OcularClock() {
                               : 'running',
                         }}
                       >
-                        {useCustomImage && customEye.imageDataUrl ? (
-                          <div className="relative h-full w-full overflow-hidden rounded-full border-4 border-[#09090B] bg-black">
+                        <div
+                          key={`clock-eye-${equippedEyeStage}-${mangekyouVariant}-${useCustomImage ? (customEye.imageDataUrl?.slice(-24) ?? 'custom') : 'canon'}-${ocularSpinBurstNonce}`}
+                          className="pointer-events-none absolute inset-0 flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-black origin-center"
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '9999px',
+                            overflow: 'hidden',
+                            transformOrigin: '50% 50%',
+                          }}
+                        >
+                          {useCustomImage && customEye.imageDataUrl ? (
                             <Image
                               src={customEye.imageDataUrl}
                               alt="Sharingan customizado"
                               fill
                               unoptimized
-                              className="object-cover"
+                              className="h-full w-full object-cover object-center origin-center"
                               style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                objectPosition: 'center',
                                 transform: `scale(${customEye.scale})`,
+                                transformOrigin: '50% 50%',
                               }}
                             />
-                          </div>
-                        ) : (
-                          <SharinganSvg
-                            stage={equippedEyeStage}
-                            variant={mangekyouVariant}
-                            isAwakening={isAwakening}
-                            isUrgent={isUrgent}
-                            isSpinBurst={isAwakening}
-                            pupilDilationNonce={saccadeNonce}
-                            specularParallax={{
-                              x: specularCounterX,
-                              y: specularCounterY,
-                            }}
-                            hideCorneaSpecular
-                          />
-                        )}
+                          ) : (
+                            <SharinganSvg
+                              stage={equippedEyeStage}
+                              variant={mangekyouVariant}
+                              isAwakening={isAwakening}
+                              isUrgent={isUrgent}
+                              isSpinBurst={isAwakening}
+                              pupilDilationNonce={saccadeNonce}
+                              specularParallax={{
+                                x: specularCounterX,
+                                y: specularCounterY,
+                              }}
+                              hideCorneaSpecular
+                              className="h-full w-full object-cover object-center origin-center"
+                            />
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

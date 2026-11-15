@@ -15,16 +15,30 @@ import { ScrollStatsView } from '@/components/scroll/ScrollStatsView';
 import { TempleView } from '@/components/clock/TempleView';
 import { useDailyChecks } from '@/hooks/useDailyChecks';
 import { useFocusTimer } from '@/hooks/useFocusTimer';
+import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import {
+  useActiveOcularPowers,
   useActiveTab,
   useHasHydrated,
   useIsTsukuyomiMode,
+  useOcularJutsuState,
   useOcularProfile,
   useTimerCore,
   useTsukuyomiStore,
 } from '@/store/useTsukuyomiStore';
 import type { IzanagiTriggerContext, MangekyouVariant } from '@/types/tsukuyomi';
+
+function hexToRgbTuple(hex: string): string | null {
+  const clean = hex.trim().replace(/^#/, '');
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return null;
+  }
+  const r = Number.parseInt(clean.slice(0, 2), 16);
+  const g = Number.parseInt(clean.slice(2, 4), 16);
+  const b = Number.parseInt(clean.slice(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
+}
 
 interface ChakraPalette {
   primary: string;
@@ -111,7 +125,9 @@ export function TsukuyomiApp() {
   const hasHydrated = useHasHydrated();
   const activeTab = useActiveTab();
   const isTsukuyomiMode = useIsTsukuyomiMode();
-  const { mangekyouVariant } = useOcularProfile();
+  const { mangekyouVariant, customEye } = useOcularProfile();
+  const activeOcularPowers = useActiveOcularPowers();
+  const { tsukuyomiOverdriveActive } = useOcularJutsuState();
   const { susanooEnabled, mode: timerMode } = useTimerCore();
   const visualBlurLevel = useTsukuyomiStore((state) => state.visualBlurLevel);
   const pendingIzanagiRescue = useTsukuyomiStore(
@@ -121,12 +137,36 @@ export function TsukuyomiApp() {
     (state) => state.declineStreakRescue,
   );
 
-  const chakraPalette =
+  const basePalette =
     UCHIHA_CHAKRA_PALETTES[mangekyouVariant] ?? UCHIHA_CHAKRA_PALETTES.itachi;
+  const customThemeHex =
+    customEye.enabled && activeOcularPowers?.visualThemeSignature.primaryGlowColor
+      ? activeOcularPowers.visualThemeSignature.primaryGlowColor
+      : null;
+  const customThemeRgb = customThemeHex ? hexToRgbTuple(customThemeHex) : null;
+
+  const chakraPalette: ChakraPalette =
+    customThemeHex && customThemeRgb
+      ? {
+          primary: customThemeHex,
+          glow: `rgba(${customThemeRgb}, 0.48)`,
+          rgb: customThemeRgb,
+        }
+      : basePalette;
+
   const isSusanooFocusActive = susanooEnabled && timerMode === 'focus';
-  const activeChakraGlow = isSusanooFocusActive
-    ? `rgba(${chakraPalette.rgb}, 0.58)`
-    : chakraPalette.glow;
+  const activeChakraGlow =
+    tsukuyomiOverdriveActive || isSusanooFocusActive
+      ? `rgba(${chakraPalette.rgb}, 0.65)`
+      : chakraPalette.glow;
+
+  useEffect(() => {
+    const pitch =
+      customEye.enabled && activeOcularPowers
+        ? activeOcularPowers.visualThemeSignature.audioPitchRate
+        : 1.0;
+    audioEngine.setCustomPitchRate(pitch);
+  }, [customEye.enabled, activeOcularPowers]);
 
   useEffect(() => {
     const rootStyle = document.documentElement.style;

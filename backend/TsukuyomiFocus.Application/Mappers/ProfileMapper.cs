@@ -99,10 +99,50 @@ public static class ProfileMapper
         {
             DoujutsuName = result.DoujutsuName,
             LoreDescription = result.LoreDescription,
+            DetectedMood = result.DetectedMood,
+            EyeCenterX = result.EyeCenterX,
+            EyeCenterY = result.EyeCenterY,
+            IrisRadiusRatio = result.IrisRadiusRatio,
+            BladeCount = result.BladeCount,
+            PatternType = result.PatternType,
+            PrimaryLineage = result.PrimaryLineage,
+            SecondaryLineage = result.SecondaryLineage,
+            IsEternalFusion = result.IsEternalFusion,
+            CenterShape = result.CenterShape,
+            BladeStyle = result.BladeStyle,
+            OuterRingStyle = result.OuterRingStyle,
+            PrimaryCrimsonHex = result.PrimaryCrimsonHex,
+            SecondaryDarkHex = result.SecondaryDarkHex,
+            HasAmaterasuFlames = result.HasAmaterasuFlames,
+            RotationOffset = result.RotationOffset,
             RawSvgCode = result.RawSvgCode,
             SvgDataUri = result.SvgDataUri,
             RasterImageUrl = result.RasterImageUrl,
             PrimaryGlowColor = result.PrimaryGlowColor,
+            OcularPowers = new OcularPowersDto
+            {
+                Rarity = result.OcularPowers.Rarity,
+                LeftEyePassive = new LeftEyePassiveDto
+                {
+                    Type = result.OcularPowers.LeftEyePassive.Type,
+                    Name = result.OcularPowers.LeftEyePassive.Name,
+                    Description = result.OcularPowers.LeftEyePassive.Description,
+                    BonusValue = result.OcularPowers.LeftEyePassive.BonusValue
+                },
+                RightEyeActiveJutsu = new RightEyeActiveJutsuDto
+                {
+                    Type = result.OcularPowers.RightEyeActiveJutsu.Type,
+                    Name = result.OcularPowers.RightEyeActiveJutsu.Name,
+                    Description = result.OcularPowers.RightEyeActiveJutsu.Description,
+                    CooldownCycles = result.OcularPowers.RightEyeActiveJutsu.CooldownCycles
+                },
+                VisualThemeSignature = new VisualThemeSignatureDto
+                {
+                    PrimaryGlowColor = result.OcularPowers.VisualThemeSignature.PrimaryGlowColor,
+                    SecondaryColor = result.OcularPowers.VisualThemeSignature.SecondaryColor,
+                    AudioPitchRate = result.OcularPowers.VisualThemeSignature.AudioPitchRate
+                }
+            },
             EquippedImageUrl = equippedImageUrl,
             AutoEquipped = autoEquipped,
             Profile = profile?.ToProfileDto()

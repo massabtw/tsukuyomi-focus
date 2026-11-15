@@ -14,6 +14,7 @@ import {
   Shield,
   Sparkles,
   Target,
+  Zap,
 } from 'lucide-react';
 import { AmbientSoundMixer } from '@/components/audio/AmbientSoundMixer';
 import { OcularClock } from '@/components/clock/OcularClock';
@@ -24,7 +25,9 @@ import { audioEngine } from '@/lib/audioEngine';
 import { cn } from '@/lib/cn';
 import { sortMissionsAmaterasuFirst } from '@/lib/gamification';
 import {
+  useActiveOcularPowers,
   useIsTsukuyomiMode,
+  useOcularJutsuState,
   useOcularProfile,
   useTimerCore,
   useTsukuyomiStore,
@@ -151,8 +154,22 @@ export function TempleView({
 
   const isLabOpen = isLabHovered || isLabPinned;
 
-  const { status, activeMissionId } = useTimerCore();
+  const { status, mode, activeMissionId } = useTimerCore();
   const isTsukuyomiMode = useIsTsukuyomiMode();
+  const activeOcularPowers = useActiveOcularPowers();
+  const {
+    tsukuyomiOverdriveActive,
+    activeJutsuCooldownCyclesRemaining,
+    activeJutsuUsedInCurrentCycle,
+  } = useOcularJutsuState();
+  const invokeRightEyeJutsu = useTsukuyomiStore(
+    (state) => state.invokeRightEyeJutsu,
+  );
+  const [jutsuBanner, setJutsuBanner] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
+  const jutsuBannerTimerRef = useRef<number | null>(null);
   const {
     equippedEyeStage,
     mangekyouVariant,
@@ -285,8 +302,36 @@ export function TempleView({
       if (cutInTimerRef.current !== null) {
         window.clearTimeout(cutInTimerRef.current);
       }
+      if (jutsuBannerTimerRef.current !== null) {
+        window.clearTimeout(jutsuBannerTimerRef.current);
+      }
     };
   }, []);
+
+  const handleTriggerRightEyeJutsu = () => {
+    const result = invokeRightEyeJutsu();
+    setJutsuBanner(result);
+    if (jutsuBannerTimerRef.current !== null) {
+      window.clearTimeout(jutsuBannerTimerRef.current);
+    }
+    jutsuBannerTimerRef.current = window.setTimeout(() => {
+      setJutsuBanner(null);
+      jutsuBannerTimerRef.current = null;
+    }, 5000);
+  };
+
+  const hasEquippedOcularPowers = Boolean(
+    customEye.enabled && activeOcularPowers,
+  );
+  const isJutsuReady =
+    hasEquippedOcularPowers &&
+    !activeJutsuUsedInCurrentCycle &&
+    activeJutsuCooldownCyclesRemaining === 0;
+  const requiresRunningFocus =
+    activeOcularPowers?.rightEyeActiveJutsu.type === 'KAMUI_SKIP' ||
+    activeOcularPowers?.rightEyeActiveJutsu.type === 'TSUKUYOMI_OVERDRIVE';
+  const canCastJutsuNow =
+    isJutsuReady && (!requiresRunningFocus || (mode === 'focus' && status !== 'idle'));
 
   const openMissionMenu = () => {
     if (isLocked) return;
@@ -989,6 +1034,99 @@ export function TempleView({
       <div className="relative z-10 my-auto flex w-full justify-center py-4 sm:py-8">
         <OcularClock />
       </div>
+
+      {/* Equipped Custom Eye Ocular Powers HUD (Passive Domain + Active Jutsu) */}
+      {hasEquippedOcularPowers && activeOcularPowers ? (
+        <div className="relative z-20 mb-3 flex w-full max-w-4xl flex-col gap-2">
+          <div className="flex flex-col items-stretch justify-between gap-2 rounded-2xl border border-white/10 bg-black/65 px-3.5 py-2.5 shadow-[0_12px_32px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:flex-row sm:items-center">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span
+                aria-hidden="true"
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{
+                  backgroundColor:
+                    activeOcularPowers.visualThemeSignature.primaryGlowColor,
+                  boxShadow: `0 0 10px ${activeOcularPowers.visualThemeSignature.primaryGlowColor}`,
+                }}
+              />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-semibold tracking-[0.16em] text-zinc-400 uppercase">
+                    Domínio Passivo Ativo ({activeOcularPowers.rarity})
+                  </span>
+                  <span className="rounded border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-zinc-100">
+                    {activeOcularPowers.leftEyePassive.name}
+                  </span>
+                </div>
+                <p className="truncate text-[11px] text-zinc-400">
+                  {activeOcularPowers.leftEyePassive.description}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={!canCastJutsuNow}
+              onClick={handleTriggerRightEyeJutsu}
+              onMouseEnter={() => {
+                if (canCastJutsuNow) audioEngine.playHover();
+              }}
+              title={activeOcularPowers.rightEyeActiveJutsu.description}
+              className={cn(
+                'inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50',
+                tsukuyomiOverdriveActive
+                  ? 'border-amber-400/70 bg-amber-950/60 text-amber-100 shadow-[0_0_20px_rgba(245,158,11,0.35)]'
+                  : 'border-white/20 bg-white/[0.08] text-white hover:bg-white/[0.14]',
+              )}
+              style={
+                canCastJutsuNow && !tsukuyomiOverdriveActive
+                  ? {
+                      borderColor: `${activeOcularPowers.visualThemeSignature.primaryGlowColor}90`,
+                      boxShadow: `0 0 18px ${activeOcularPowers.visualThemeSignature.primaryGlowColor}38`,
+                    }
+                  : undefined
+              }
+            >
+              <Zap
+                className="h-3.5 w-3.5 shrink-0"
+                style={{
+                  color:
+                    activeOcularPowers.visualThemeSignature.primaryGlowColor,
+                }}
+                aria-hidden="true"
+              />
+              <span className="truncate max-w-[220px]">
+                {tsukuyomiOverdriveActive
+                  ? 'Overdrive 2x Ativo'
+                  : activeJutsuUsedInCurrentCycle
+                    ? 'Jutsu Invocado no Ciclo'
+                    : activeJutsuCooldownCyclesRemaining > 0
+                      ? `Recarga (${activeJutsuCooldownCyclesRemaining} ciclo)`
+                      : activeOcularPowers.rightEyeActiveJutsu.name}
+              </span>
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {jutsuBanner ? (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                role="status"
+                className={cn(
+                  'rounded-xl border px-3.5 py-2 text-center text-xs font-medium backdrop-blur-xl',
+                  jutsuBanner.ok
+                    ? 'border-white/15 bg-black/80 text-zinc-100 shadow-[0_0_24px_var(--chakra-glow,rgba(220,38,38,0.35))]'
+                    : 'border-red-900/70 bg-red-950/60 text-red-200',
+                )}
+              >
+                {jutsuBanner.message}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
+      ) : null}
 
       {/* Bottom Stage: Unified Horizontal Command Dock */}
       <div

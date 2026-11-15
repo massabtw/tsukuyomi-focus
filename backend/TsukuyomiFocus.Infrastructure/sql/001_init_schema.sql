@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE user_profiles ALTER COLUMN custom_eye_image_url TYPE TEXT;
+
 -- 2. Missões do Kanban
 CREATE TABLE IF NOT EXISTS missions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

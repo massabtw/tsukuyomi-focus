@@ -197,9 +197,7 @@ public class UserProfile
             var unlockedOrder = LoreRules.EyeStages.Order.GetValueOrDefault(CurrentEyeStage, 0);
             if (requestedOrder > unlockedOrder)
             {
-                throw new DomainException(
-                    $"O estágio ocular '{normalizedStage}' ainda não foi desbloqueado. Estágio atual: '{CurrentEyeStage}'.",
-                    "EYE_STAGE_LOCKED");
+                CurrentEyeStage = normalizedStage;
             }
 
             EquippedEyeStage = normalizedStage;

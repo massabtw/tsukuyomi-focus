@@ -74,14 +74,62 @@ public class GenerateSharinganRequestDto
     public bool AutoEquip { get; set; } = true;
 }
 
+public class LeftEyePassiveDto
+{
+    public string Type { get; set; } = "CHAKRA_MULTIPLIER";
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public double BonusValue { get; set; } = 1.25;
+}
+
+public class RightEyeActiveJutsuDto
+{
+    public string Type { get; set; } = "TSUKUYOMI_OVERDRIVE";
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int CooldownCycles { get; set; } = 1;
+}
+
+public class VisualThemeSignatureDto
+{
+    public string PrimaryGlowColor { get; set; } = "#DC2626";
+    public string SecondaryColor { get; set; } = "#450A0A";
+    public double AudioPitchRate { get; set; } = 1.0;
+}
+
+public class OcularPowersDto
+{
+    public string Rarity { get; set; } = "Rank S";
+    public LeftEyePassiveDto LeftEyePassive { get; set; } = new();
+    public RightEyeActiveJutsuDto RightEyeActiveJutsu { get; set; } = new();
+    public VisualThemeSignatureDto VisualThemeSignature { get; set; } = new();
+}
+
 public class GenerateSharinganResponseDto
 {
     public string DoujutsuName { get; set; } = string.Empty;
     public string LoreDescription { get; set; } = string.Empty;
+    public string DetectedMood { get; set; } = string.Empty;
+    public double EyeCenterX { get; set; } = 0.5;
+    public double EyeCenterY { get; set; } = 0.5;
+    public double IrisRadiusRatio { get; set; } = 0.22;
+    public int BladeCount { get; set; } = 3;
+    public string PatternType { get; set; } = "itachi_shuriken";
+    public string PrimaryLineage { get; set; } = "itachi";
+    public string? SecondaryLineage { get; set; }
+    public bool IsEternalFusion { get; set; }
+    public string CenterShape { get; set; } = "circle";
+    public string BladeStyle { get; set; } = "curved_shuriken";
+    public string OuterRingStyle { get; set; } = "tomoe_ring";
+    public string PrimaryCrimsonHex { get; set; } = "#DC2626";
+    public string SecondaryDarkHex { get; set; } = "#450A0A";
+    public bool HasAmaterasuFlames { get; set; }
+    public double RotationOffset { get; set; }
     public string RawSvgCode { get; set; } = string.Empty;
     public string SvgDataUri { get; set; } = string.Empty;
     public string RasterImageUrl { get; set; } = string.Empty;
     public string PrimaryGlowColor { get; set; } = "#DC2626";
+    public OcularPowersDto OcularPowers { get; set; } = new();
     public string EquippedImageUrl { get; set; } = string.Empty;
     public bool AutoEquipped { get; set; }
     public ProfileDto? Profile { get; set; }

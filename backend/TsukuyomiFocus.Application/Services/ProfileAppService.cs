@@ -169,10 +169,10 @@ public sealed class ProfileAppService : IProfileAppService
             ? "svg"
             : request.OutputFormat.Trim().ToLowerInvariant();
 
-        if (normalizedOutputFormat is not ("svg" or "raster"))
+        if (normalizedOutputFormat is not ("svg" or "raster" or "anime_svg" or "photo_lens"))
         {
             return ServiceResult<GenerateSharinganResponseDto>.BadRequest(
-                $"Formato de saída '{request.OutputFormat}' inválido. Use 'svg' ou 'raster'.",
+                $"Formato de saída '{request.OutputFormat}' inválido. Use 'anime_svg', 'photo_lens', 'svg' ou 'raster'.",
                 "INVALID_OUTPUT_FORMAT");
         }
 
@@ -225,20 +225,42 @@ public sealed class ProfileAppService : IProfileAppService
             ? normalizedVariant
             : null;
 
-        return await ExecuteInProfileTransactionAsync(async (profile, connection, transaction, _, nowUtc) =>
+        try
         {
-            profile.CustomizeEyes(
-                equippedEyeStage: null,
-                mangekyouVariant: variantToEquip,
-                customEyeImageUrl: equippedImageUrl,
-                clearCustomEyeImage: false,
-                nowUtc: nowUtc);
+            var autoEquipResult = await ExecuteInProfileTransactionAsync(async (profile, connection, transaction, _, nowUtc) =>
+            {
+                profile.CustomizeEyes(
+                    equippedEyeStage: null,
+                    mangekyouVariant: variantToEquip,
+                    customEyeImageUrl: equippedImageUrl,
+                    clearCustomEyeImage: false,
+                    nowUtc: nowUtc);
 
-            await _profileRepository.UpdateAsync(profile, connection, transaction, cancellationToken);
+                await _profileRepository.UpdateAsync(profile, connection, transaction, cancellationToken);
 
-            return ServiceResult<GenerateSharinganResponseDto>.Ok(
-                safeResult.ToGenerateSharinganResponseDto(equippedImageUrl, true, profile));
-        }, cancellationToken);
+                return ServiceResult<GenerateSharinganResponseDto>.Ok(
+                    safeResult.ToGenerateSharinganResponseDto(equippedImageUrl, true, profile));
+            }, cancellationToken);
+
+            if (autoEquipResult.IsSuccess)
+            {
+                return autoEquipResult;
+            }
+
+            _logger.LogWarning(
+                "Não foi possível equipar automaticamente o Sharingan gerado no banco ({Code}: {Message}); retornando resultado gerado mesmo assim.",
+                autoEquipResult.ErrorCode,
+                autoEquipResult.Error);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(
+                ex,
+                "Não foi possível salvar automaticamente o Sharingan gerado no banco; retornando resultado gerado mesmo assim.");
+        }
+
+        return ServiceResult<GenerateSharinganResponseDto>.Ok(
+            safeResult.ToGenerateSharinganResponseDto(equippedImageUrl, false));
     }
 
     private GeneratedSharinganResult EnsureValidSvgResult(

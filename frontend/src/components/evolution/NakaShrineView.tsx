@@ -28,6 +28,7 @@ import {
 } from '@/lib/gamification';
 import {
   useOcularProfile,
+  useOcularSpinBurstNonce,
   useTsukuyomiStore,
 } from '@/store/useTsukuyomiStore';
 import type { EyeStage, MangekyouVariant } from '@/types/tsukuyomi';
@@ -67,6 +68,8 @@ export function NakaShrineView() {
     longestStreak,
     isBetaFullAccess,
   } = useOcularProfile();
+  const ocularSpinBurstNonce = useOcularSpinBurstNonce();
+  const isCustomEyeActive = customEye.enabled && Boolean(customEye.imageDataUrl);
 
   const equipEyeStage = useTsukuyomiStore((state) => state.equipEyeStage);
   const setMangekyouVariant = useTsukuyomiStore(
@@ -354,43 +357,51 @@ export function NakaShrineView() {
             }
             className="will-change-transform relative z-10 grid grid-cols-1 items-center gap-8 lg:grid-cols-12"
           >
-            {/* Active Eye Display (Plano +1) */}
+            {/* Active Eye Display (Plano +1 — 100% Centered) */}
             <div className="flex flex-col items-center justify-center lg:col-span-4">
-              <motion.div
-                style={altarParallax.layerFg}
-                className="will-change-transform relative flex h-44 w-44 items-center justify-center rounded-full border border-red-950/80 bg-black p-4 shadow-[0_20px_50px_rgba(0,0,0,0.95)]"
-              >
-                {customEye.enabled && customEye.imageDataUrl ? (
-                  <div
-                    className="relative h-full w-full overflow-hidden rounded-full bg-black"
-                    style={{
-                      boxShadow: `0 0 ${Math.round(customEye.glowIntensity * 26)}px rgba(220, 38, 38, ${(0.18 + customEye.glowIntensity * 0.6).toFixed(2)}), inset 0 0 24px #000000`,
-                    }}
-                  >
-                    <Image
-                      src={customEye.imageDataUrl}
-                      alt="Olho customizado equipado no Santuário Naka"
-                      fill
-                      unoptimized
-                      className="object-cover"
-                      style={{ transform: `scale(${customEye.scale})` }}
+              <div className="relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full border border-red-950/80 bg-black p-3 shadow-[0_20px_50px_rgba(0,0,0,0.95)]">
+                <div
+                  key={`altar-eye-${equippedEyeStage}-${mangekyouVariant}-${isCustomEyeActive ? (customEye.imageDataUrl?.slice(-24) ?? 'custom') : 'canon'}-${ocularSpinBurstNonce}`}
+                  className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-black origin-center"
+                  style={
+                    isCustomEyeActive
+                      ? {
+                          boxShadow: `0 0 ${Math.round(customEye.glowIntensity * 26)}px rgba(220, 38, 38, ${(0.18 + customEye.glowIntensity * 0.6).toFixed(2)}), inset 0 0 24px #000000`,
+                          transformOrigin: 'center center',
+                        }
+                      : { transformOrigin: 'center center' }
+                  }
+                >
+                  {isCustomEyeActive && customEye.imageDataUrl ? (
+                    <>
+                      <Image
+                        src={customEye.imageDataUrl}
+                        alt="Olho customizado equipado no Santuário Naka"
+                        fill
+                        unoptimized
+                        className="h-full w-full object-cover object-center origin-center"
+                        style={{
+                          transform: `scale(${customEye.scale})`,
+                          transformOrigin: 'center center',
+                        }}
+                      />
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 rounded-full"
+                        style={{ boxShadow: 'inset 0 0 24px #000000' }}
+                      />
+                    </>
+                  ) : (
+                    <SharinganSvg
+                      stage={equippedEyeStage}
+                      variant={mangekyouVariant}
+                      className="h-full w-full drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]"
                     />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 rounded-full"
-                      style={{ boxShadow: 'inset 0 0 24px #000000' }}
-                    />
-                  </div>
-                ) : (
-                  <SharinganSvg
-                    stage={equippedEyeStage}
-                    variant={mangekyouVariant}
-                    className="h-36 w-36 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]"
-                  />
-                )}
-              </motion.div>
+                  )}
+                </div>
+              </div>
               <span className="mt-3 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-400">
-                {customEye.enabled && customEye.imageDataUrl
+                {isCustomEyeActive
                   ? 'Olho Customizado Ativo'
                   : equippedDef.name}
               </span>
@@ -557,7 +568,8 @@ export function NakaShrineView() {
                 isBetaFullAccess,
               );
               const unlockedViaBeta = unlocked && !loreUnlocked;
-              const isEquipped = equippedEyeStage === def.stage;
+              const isEquipped =
+                equippedEyeStage === def.stage && !isCustomEyeActive;
               const unlockedViaStreak =
                 loreUnlocked &&
                 def.alternativeStreakRequirement !== undefined &&
@@ -805,7 +817,11 @@ export function NakaShrineView() {
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {MANGEKYOU_VARIANTS.map((info) => {
-              const isSelected = mangekyouVariant === info.variant;
+              const isSelected =
+                mangekyouVariant === info.variant &&
+                (equippedEyeStage === 'mangekyou' ||
+                  equippedEyeStage === 'ems') &&
+                !isCustomEyeActive;
               const isFlashing = variantFlash?.variant === info.variant;
 
               return (

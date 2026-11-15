@@ -103,21 +103,77 @@ export interface ApiDevSimulatePayload {
   setCurrentStreak?: number;
 }
 
+export type SharinganOutputFormat =
+  | 'anime_svg'
+  | 'photo_lens'
+  | 'svg'
+  | 'raster';
+
 export interface ApiGenerateSharinganPayload {
   prompt?: string;
   baseEyeImageBase64?: string | null;
   styleVariant: MangekyouVariant | 'custom';
-  outputFormat: 'svg' | 'raster';
+  outputFormat: SharinganOutputFormat;
   autoEquip: boolean;
+}
+
+export interface ApiLeftEyePassiveDto {
+  type:
+    | 'CHAKRA_MULTIPLIER'
+    | 'AMATERASU_MASTERY'
+    | 'IZANAGI_REGEN'
+    | 'TIME_DILATION'
+    | 'VISUAL_IMMUNITY';
+  name: string;
+  description: string;
+  bonusValue: number;
+}
+
+export interface ApiRightEyeActiveJutsuDto {
+  type:
+    | 'KAMUI_SKIP'
+    | 'TSUKUYOMI_OVERDRIVE'
+    | 'KOTOAMATSUKAMI_COMPLETE'
+    | 'SHINRA_TENSEI_PURGE';
+  name: string;
+  description: string;
+  cooldownCycles: number;
+}
+
+export interface ApiVisualThemeSignatureDto {
+  primaryGlowColor: string;
+  secondaryColor: string;
+  audioPitchRate: number;
+}
+
+export interface ApiOcularPowersDto {
+  rarity: 'Rank A' | 'Rank S' | 'Rank SS - Divino';
+  leftEyePassive: ApiLeftEyePassiveDto;
+  rightEyeActiveJutsu: ApiRightEyeActiveJutsuDto;
+  visualThemeSignature: ApiVisualThemeSignatureDto;
 }
 
 export interface ApiGenerateSharinganResponseDto {
   doujutsuName: string;
   loreDescription: string;
+  detectedMood: string;
+  eyeCenterX: number;
+  eyeCenterY: number;
+  irisRadiusRatio: number;
+  bladeCount: number;
+  patternType: string;
+  centerShape?: string;
+  bladeStyle?: string;
+  outerRingStyle?: string;
+  primaryCrimsonHex: string;
+  secondaryDarkHex: string;
+  hasAmaterasuFlames: boolean;
+  rotationOffset: number;
   rawSvgCode: string;
   svgDataUri: string;
   rasterImageUrl: string;
   primaryGlowColor: string;
+  ocularPowers?: ApiOcularPowersDto;
   equippedImageUrl: string;
   autoEquipped: boolean;
   profile: ApiProfileDto | null;

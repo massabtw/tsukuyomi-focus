@@ -226,6 +226,7 @@ export function blindNextHealthyEye(izanagi: IzanagiState): IzanagiState | null 
 export function applyIzanagiRestoration(
   izanagi: IzanagiState,
   durationMinutes: number,
+  restorationTargetMinutes: number = IZANAGI_RESTORATION_MINUTES,
 ): IzanagiState {
   if (durationMinutes <= 0) {
     return izanagi;
@@ -240,15 +241,13 @@ export function applyIzanagiRestoration(
     };
   }
 
+  const targetMinutes = Math.max(15, restorationTargetMinutes);
   let rightEyeBlind = izanagi.rightEyeBlind;
   let leftEyeBlind = izanagi.leftEyeBlind;
   let progress = izanagi.restorationProgressMinutes + durationMinutes;
 
-  while (
-    progress >= IZANAGI_RESTORATION_MINUTES &&
-    (rightEyeBlind || leftEyeBlind)
-  ) {
-    progress -= IZANAGI_RESTORATION_MINUTES;
+  while (progress >= targetMinutes && (rightEyeBlind || leftEyeBlind)) {
+    progress -= targetMinutes;
     if (rightEyeBlind) {
       rightEyeBlind = false;
     } else if (leftEyeBlind) {
